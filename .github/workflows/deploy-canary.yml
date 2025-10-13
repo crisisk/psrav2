@@ -187,7 +187,7 @@ jobs:
 
       - name: Notify Slack - UAT Tests Started
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -233,7 +233,7 @@ jobs:
           echo "Once approved, canary deployment will begin."
 
       - name: Notify Slack - Awaiting Manual Approval
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -308,7 +308,7 @@ jobs:
 
       - name: Notify Slack - Build Complete
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -555,7 +555,7 @@ jobs:
 
       - name: Notify Slack - Stage 1 Complete
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -676,7 +676,7 @@ jobs:
 
       - name: Notify Slack - Stage 2 Complete
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -777,7 +777,7 @@ jobs:
 
       - name: Notify Slack - Deployment Complete
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -881,7 +881,7 @@ jobs:
 
       - name: Notify Slack - Smoke Tests Complete
         if: always()
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
@@ -948,7 +948,7 @@ jobs:
           kubectl -n "$NAMESPACE" get pods -l app=psra
 
       - name: Notify Slack - Emergency Rollback
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
             {
