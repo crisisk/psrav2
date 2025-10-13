@@ -32,7 +32,7 @@ chromadb==0.4.22
 httpx==0.26.0
 tenacity==8.2.3
 python-multipart==0.0.9
-pyjwt==2.8.0
+pyjwt==2.10.1
 cryptography==41.0.7
 
 # Secrets Management
