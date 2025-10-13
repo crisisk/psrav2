@@ -31,7 +31,7 @@ chromadb==0.4.22
 # Utilities
 httpx==0.26.0
 tenacity==8.2.3
-python-multipart==0.0.9
+python-multipart==0.0.20
 pyjwt==2.8.0
 cryptography==41.0.7
 
