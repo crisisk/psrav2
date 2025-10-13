@@ -1,0 +1,213 @@
+name: Epic
+description: Create an epic to track a large body of work
+title: "[EPIC]: "
+labels: ["epic", "planning"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to create an epic that encompasses multiple user stories or features.
+
+  - type: input
+    id: epic-title
+    attributes:
+      label: Epic Title
+      description: A concise title for this epic
+      placeholder: e.g., User Authentication System Overhaul
+    validations:
+      required: true
+
+  - type: textarea
+    id: epic-description
+    attributes:
+      label: Epic Description
+      description: A comprehensive description of what this epic encompasses
+      placeholder: Provide a detailed overview of the epic...
+    validations:
+      required: true
+
+  - type: textarea
+    id: business-objective
+    attributes:
+      label: Business Objective
+      description: What business goal does this epic support?
+      placeholder: |
+        - Strategic goal: [describe]
+        - Key metrics: [define success metrics]
+        - Timeline: [expected completion]
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-stories
+    attributes:
+      label: User Stories
+      description: List the key user stories that make up this epic
+      placeholder: |
+        - [ ] As a [user type], I want [goal] so that [benefit] (#issue)
+        - [ ] As a [user type], I want [goal] so that [benefit] (#issue)
+        - [ ] As a [user type], I want [goal] so that [benefit] (#issue)
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included and excluded from this epic?
+      placeholder: |
+        **In Scope:**
+        - Feature 1
+        - Feature 2
+
+        **Out of Scope:**
+        - Feature X
+        - Feature Y
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Epic Acceptance Criteria
+      description: High-level criteria that must be met for this epic to be considered complete
+      placeholder: |
+        - [ ] All user stories completed and tested
+        - [ ] Documentation updated
+        - [ ] Performance benchmarks met
+        - [ ] Security review completed
+        - [ ] Deployed to production
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: What is the priority of this epic?
+      options:
+        - Critical - Top priority
+        - High - Important
+        - Medium - Moderate priority
+        - Low - Future consideration
+    validations:
+      required: true
+
+  - type: dropdown
+    id: quarter
+    attributes:
+      label: Target Quarter
+      description: When should this epic be completed?
+      options:
+        - Q1 2025
+        - Q2 2025
+        - Q3 2025
+        - Q4 2025
+        - Q1 2026
+        - Q2 2026
+        - Future/Backlog
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List any dependencies on other epics, teams, or external factors
+      placeholder: |
+        - Dependency 1: [description] (#issue or team)
+        - Dependency 2: [description] (#issue or team)
+    validations:
+      required: false
+
+  - type: textarea
+    id: technical-approach
+    attributes:
+      label: Technical Approach
+      description: High-level technical approach and architecture considerations
+      placeholder: |
+        - Architecture changes: [describe]
+        - Technology stack: [list technologies]
+        - Integration points: [list systems]
+    validations:
+      required: false
+
+  - type: textarea
+    id: stakeholders
+    attributes:
+      label: Stakeholders
+      description: Who are the key stakeholders for this epic?
+      placeholder: |
+        - Product Owner: @username
+        - Tech Lead: @username
+        - Business Stakeholder: @username
+        - Other: @username
+    validations:
+      required: false
+
+  - type: textarea
+    id: success-metrics
+    attributes:
+      label: Success Metrics
+      description: How will success be measured?
+      placeholder: |
+        - Metric 1: [KPI and target]
+        - Metric 2: [KPI and target]
+        - Metric 3: [KPI and target]
+    validations:
+      required: false
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and Mitigation
+      description: Potential risks and mitigation strategies
+      placeholder: |
+        - Risk 1: [description] | Mitigation: [strategy]
+        - Risk 2: [description] | Mitigation: [strategy]
+    validations:
+      required: false
+
+  - type: input
+    id: budget
+    attributes:
+      label: Budget/Resources
+      description: Estimated resources or budget required
+      placeholder: e.g., 3 developers, 8 weeks
+    validations:
+      required: false
+
+  - type: textarea
+    id: milestones
+    attributes:
+      label: Key Milestones
+      description: Important milestones and checkpoints
+      placeholder: |
+        - [ ] Milestone 1: [date]
+        - [ ] Milestone 2: [date]
+        - [ ] Milestone 3: [date]
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: Additional Notes
+      description: Any other relevant information
+      placeholder: Additional context, links, or references...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have aligned this epic with business objectives
+          required: true
+        - label: I have identified key stakeholders
+          required: true
+        - label: I have defined clear acceptance criteria
+          required: true

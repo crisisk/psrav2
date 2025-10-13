@@ -1,0 +1,11 @@
+{
+  "host": "{{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.host }}{{ end }}",
+  "port": {{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.port }}{{ end }},
+  "secure": {{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.secure }}{{ end }},
+  "auth": {
+    "user": "{{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.user }}{{ end }}",
+    "pass": "{{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.password }}{{ end }}"
+  },
+  "from": "{{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.from }}{{ end }}",
+  "replyTo": "{{ with secret "kv/data/rentguy/smtp" }}{{ .Data.data.replyTo }}{{ end }}"
+}

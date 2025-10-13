@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rentguy-config
+  namespace: sevensa-rentguy
+data:
+  app_config.json: |
+    {
+      "app": {
+        "name": "RentGuy",
+        "version": "1.0.0-dev",
+        "description": "Property Management Platform (Development)"
+      },
+      "features": {
+        "onboarding": true,
+        "payments": true,
+        "maintenance": true,
+        "reporting": true,
+        "notifications": true,
+        "debug": true
+      },
+      "api": {
+        "timeout": 60000,
+        "retries": 5
+      },
+      "ui": {
+        "theme": "light",
+        "language": "en",
+        "dateFormat": "DD/MM/YYYY",
+        "timeFormat": "HH:mm",
+        "showDebugInfo": true
+      }
+    }

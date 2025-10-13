@@ -1,0 +1,98 @@
+[
+  {
+    "hsCode": "390110",
+    "tradeAgreement": "CETA",
+    "ruleText": "Manufacture in which the value of all the non-originating materials used does not exceed 40% of the ex-works price.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "V", "payload": { "maxNonOrigin": 40 } },
+        { "type": "H", "payload": { "change": "CTH" } }
+      ]
+    }
+  },
+  {
+    "hsCode": "390120",
+    "tradeAgreement": "CETA",
+    "ruleText": "Production from polymers of heading 39.01 combined with at least one qualifying recycling process.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "V", "payload": { "maxNonOrigin": 45 } },
+        { "type": "A", "payload": { "requiredProcesses": ["Extrusion", "Recycling Loop"] } }
+      ]
+    }
+  },
+  {
+    "hsCode": "850440",
+    "tradeAgreement": "EU-UK-TCA",
+    "ruleText": "Change to heading 8504 combined with completion of SMT Assembly and Thermal Testing in the exporting Party.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "H", "payload": { "change": "CTH" } },
+        { "type": "A", "payload": { "requiredProcesses": ["SMT Assembly", "Thermal Testing"] } }
+      ]
+    }
+  },
+  {
+    "hsCode": "903180",
+    "tradeAgreement": "EU-UK-TCA",
+    "ruleText": "Manufacture in which non-originating materials of heading 9030 or 9031 do not exceed 35% of the ex-works price.",
+    "priority": 2,
+    "conditions": {
+      "alternatives": [
+        { "type": "V", "payload": { "maxNonOrigin": 35 } },
+        { "type": "H", "payload": { "change": "CTSH" } }
+      ]
+    }
+  },
+  {
+    "hsCode": "720915",
+    "tradeAgreement": "EU-JP-EPA",
+    "ruleText": "Annealing and surface treatment carried out in the exporting Party with non-originating material threshold of 35%.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "A", "payload": { "requiredProcesses": ["Annealing", "Surface Treatment"] } },
+        { "type": "V", "payload": { "maxNonOrigin": 35 } }
+      ]
+    }
+  },
+  {
+    "hsCode": "940540",
+    "tradeAgreement": "RCEP",
+    "ruleText": "Change in tariff heading or Regional Value Content of at least 45% for energy efficient lighting units.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "H", "payload": { "change": "CTH" } },
+        { "type": "V", "payload": { "rvcThreshold": 45 } }
+      ]
+    }
+  },
+  {
+    "hsCode": "400110",
+    "tradeAgreement": "RCEP",
+    "ruleText": "Wholly obtained or change to heading 4001 from any other chapter provided compounding occurs in the exporting Party.",
+    "priority": 2,
+    "conditions": {
+      "alternatives": [
+        { "type": "A", "payload": { "requiredProcesses": ["Compounding", "Vulcanisation"] } },
+        { "type": "H", "payload": { "change": "CTSH" } }
+      ]
+    }
+  },
+  {
+    "hsCode": "730890",
+    "tradeAgreement": "USMCA",
+    "ruleText": "Regional value content of at least 60% using the net cost method or 50% using the transaction value method.",
+    "priority": 1,
+    "conditions": {
+      "alternatives": [
+        { "type": "V", "payload": { "rvcThreshold": 60, "method": "NC" } },
+        { "type": "V", "payload": { "rvcThreshold": 50, "method": "TV" } }
+      ]
+    }
+  }
+]

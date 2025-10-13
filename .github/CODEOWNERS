@@ -1,0 +1,11 @@
+# Default ownership
+* @crisisk @psra-compliance-arch
+
+# Docs
+/docs/ @psra-knowledge-base
+
+# CI configurations
+/ci/ @psra-build-engineering
+
+# Security sensitive code
+/lib/ @psra-security

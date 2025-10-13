@@ -1,0 +1,71 @@
+version: "2.0.0"
+metadata:
+  rule_id: "CETA-HS39-001"
+  title: "Polymerization requirement for HS 39.01"
+  description: |
+    Goods classified under HS 3901 qualify for CETA preferential origin if
+    polymerization of monomers occurs within the EU or Canada and the regional
+    value content reaches 60 percent using the build-up method.
+  agreement:
+    code: "CETA"
+    name: "Comprehensive Economic and Trade Agreement"
+  hs_code:
+    chapter: "39"
+    heading: "3901"
+    subheading: "390110"
+  jurisdiction:
+    - "EU"
+    - "CA"
+  effective_from: "2024-01-01"
+  effective_to: null
+  priority: 1
+  supersedes: []
+criteria:
+  bom:
+    required_inputs:
+      - type: "material"
+        hs_code: "2710"
+        description: "Originating naphtha feedstock"
+        max_percentage: 50.0
+    regional_value_content:
+      method: "build-up"
+      threshold: 60.0
+      calculation_window_days: 365
+  process:
+    required_operations:
+      - code: "POLYMERIZATION"
+        description: "Polymerization of monomers into polymers"
+      - code: "EXTRUSION"
+        description: "Extrusion or pelletizing in originating territory"
+    disallowed_operations:
+      - code: "PACKAGING"
+        description: "Simple packaging operations"
+  documentation:
+    certificates:
+      - "EUR.1"
+    record_retention_days: 3650
+    additional_evidence:
+      - type: "audit-report"
+        description: "Third-party audit confirming production records"
+decision:
+  verdicts:
+    qualified:
+      description: "Meets polymerization and regional value content thresholds"
+      citations:
+        - reference: "CETA Annex 5-A"
+          section: "HS 39"
+          url: "https://www.international.gc.ca/trade-commerce/trade-agreements-accords-commerciaux/agr-acc/ceta-aecg/text-texte/05.aspx"
+    disqualified:
+      reasons:
+        - code: "INSUFFICIENT_RVC"
+          description: "Regional value content below 60 percent"
+          severity: "high"
+        - code: "MISSING_PROCESS"
+          description: "Polymerization not performed in originating territory"
+          severity: "critical"
+audit:
+  traceability:
+    lineage_required: true
+    ledger_reference: "ledger://psra/version-ledger/v1"
+  last_reviewed: "2025-01-15"
+  reviewer: "compliance-board"

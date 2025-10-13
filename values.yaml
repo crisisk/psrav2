@@ -1,0 +1,239 @@
+# Default values for rentguy.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  environment: production
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: longhorn
+
+# API settings
+api:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: sevensa/rentguy-api
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  env:
+    NODE_ENV: production
+    PORT: 3000
+    LOG_LEVEL: info
+
+# Frontend settings
+frontend:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: sevensa/rentguy-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+# Ingress settings
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: sevensa-security-oauth2@kubernetescrd
+  hosts:
+    - host: rentguy.sevensa.nl
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /
+          pathType: Prefix
+          service: frontend
+    - host: onboarding.rentguy.sevensa.nl
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /
+          pathType: Prefix
+          service: frontend
+  tls:
+    - secretName: rentguy-tls
+      hosts:
+        - rentguy.sevensa.nl
+        - onboarding.rentguy.sevensa.nl
+
+# Config settings
+config:
+  api_url: https://rentguy.sevensa.nl/api
+  keycloak_url: https://keycloak.sevensa.nl
+  keycloak_realm: sevensa
+  keycloak_client_id: rentguy-client
+  openbao_url: https://openbao.sevensa.nl
+  app_config:
+    app:
+      name: RentGuy
+      version: 1.0.0
+      description: Property Management Platform
+    features:
+      onboarding: true
+      payments: true
+      maintenance: true
+      reporting: true
+      notifications: true
+    api:
+      timeout: 30000
+      retries: 3
+    ui:
+      theme: light
+      language: en
+      dateFormat: DD/MM/YYYY
+      timeFormat: HH:mm
+
+# Secret settings
+secrets:
+  keycloak:
+    client_secret: ""
+  openbao:
+    role_id: ""
+    secret_id: ""
+  jwt:
+    secret: ""
+  tls:
+    cert: ""
+    key: ""
+
+# Persistence settings
+persistence:
+  uploads:
+    enabled: true
+    size: 20Gi
+    storageClass: longhorn
+    accessMode: ReadWriteMany
+
+# PostgreSQL settings
+postgresql:
+  enabled: true
+  auth:
+    username: rentguy
+    password: ""
+    database: rentguy
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: longhorn
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Redis settings
+redis:
+  enabled: true
+  auth:
+    password: ""
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: longhorn
+  replica:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: longhorn
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Network policy settings
+networkPolicy:
+  enabled: true
+
+# Service account settings
+serviceAccount:
+  create: true
+  name: rentguy-sa
+  annotations: {}

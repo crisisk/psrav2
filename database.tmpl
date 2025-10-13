@@ -1,0 +1,10 @@
+{
+  "host": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.db_host }}{{ end }}",
+  "port": {{ with secret "kv/data/rentguy/config" }}{{ .Data.data.db_port }}{{ end }},
+  "database": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.db_name }}{{ end }}",
+  "username": "{{ with secret "database/creds/rentguy" }}{{ .Data.username }}{{ end }}",
+  "password": "{{ with secret "database/creds/rentguy" }}{{ .Data.password }}{{ end }}",
+  "ssl": false,
+  "max_connections": 10,
+  "idle_timeout": 10000
+}

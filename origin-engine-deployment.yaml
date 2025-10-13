@@ -1,0 +1,352 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: psra-ltsd
+  labels:
+    name: psra-ltsd
+    app.kubernetes.io/part-of: psra-ltsd
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: origin-engine-config
+  namespace: psra-ltsd
+data:
+  ENABLE_AUTH: "true"
+  ENABLE_STREAMING: "true"
+  MAX_CONCURRENT_CALCULATIONS: "10"
+  OPENAI_MODEL: "gpt-4.1-mini"
+  ENABLE_PARALLEL_PROCESSING: "true"
+  CACHE_TTL: "86400"
+  ENABLE_TRACING: "true"
+  LANGSMITH_API_URL: "https://api.smith.langchain.com"
+  REDIS_HOST: "origin-engine-redis"
+  REDIS_PORT: "6379"
+  CHECKPOINT_DIR: "/data/checkpoints"
+  LOG_LEVEL: "INFO"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  CORS_ORIGINS: '["*"]'
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: origin-engine-secrets
+  namespace: psra-ltsd
+type: Opaque
+data:
+  API_KEY: eW91ci1hcGkta2V5 # your-api-key in base64
+  OPENAI_API_KEY: eW91ci1vcGVuYWktYXBpLWtleQ== # your-openai-api-key in base64
+  LANGSMITH_API_KEY: eW91ci1sYW5nc21pdGgtYXBpLWtleQ== # your-langsmith-api-key in base64
+  REDIS_PASSWORD: eW91ci1yZWRpcy1wYXNzd29yZA== # your-redis-password in base64
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: origin-engine
+  namespace: psra-ltsd
+  labels:
+    app: origin-engine
+    app.kubernetes.io/name: origin-engine
+    app.kubernetes.io/part-of: psra-ltsd
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: origin-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: origin-engine
+        app.kubernetes.io/name: origin-engine
+        app.kubernetes.io/part-of: psra-ltsd
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
+    spec:
+      containers:
+      - name: origin-engine
+        image: origin-engine:2.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: origin-engine-config
+        - secretRef:
+            name: origin-engine-secrets
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+        volumeMounts:
+        - name: origin-engine-data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: origin-engine-data
+        persistentVolumeClaim:
+          claimName: origin-engine-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: origin-engine-pvc
+  namespace: psra-ltsd
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: origin-engine-redis
+  namespace: psra-ltsd
+  labels:
+    app: origin-engine-redis
+    app.kubernetes.io/name: origin-engine-redis
+    app.kubernetes.io/part-of: psra-ltsd
+spec:
+  serviceName: origin-engine-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: origin-engine-redis
+  template:
+    metadata:
+      labels:
+        app: origin-engine-redis
+        app.kubernetes.io/name: origin-engine-redis
+        app.kubernetes.io/part-of: psra-ltsd
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --appendonly
+        - "yes"
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: origin-engine-secrets
+              key: REDIS_PASSWORD
+        resources:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+          requests:
+            cpu: "0.5"
+            memory: "512Mi"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+          capabilities:
+            drop:
+            - ALL
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+      storageClassName: standard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: origin-engine
+  namespace: psra-ltsd
+  labels:
+    app: origin-engine
+    app.kubernetes.io/name: origin-engine
+    app.kubernetes.io/part-of: psra-ltsd
+spec:
+  selector:
+    app: origin-engine
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: origin-engine-redis
+  namespace: psra-ltsd
+  labels:
+    app: origin-engine-redis
+    app.kubernetes.io/name: origin-engine-redis
+    app.kubernetes.io/part-of: psra-ltsd
+spec:
+  selector:
+    app: origin-engine-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+  clusterIP: None
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: origin-engine-network-policy
+  namespace: psra-ltsd
+spec:
+  podSelector:
+    matchLabels:
+      app: origin-engine
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: psra-ltsd
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: origin-engine-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: origin-engine-redis-network-policy
+  namespace: psra-ltsd
+spec:
+  podSelector:
+    matchLabels:
+      app: origin-engine-redis
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: origin-engine
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress: []
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: origin-engine-hpa
+  namespace: psra-ltsd
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: origin-engine
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60

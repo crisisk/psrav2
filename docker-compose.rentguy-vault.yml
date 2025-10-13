@@ -1,0 +1,195 @@
+version: '3.8'
+
+# Dit bestand definieert de RentGuy service met Zero-Trust Network Access, Keycloak en Vault integratie
+# RentGuy bestaat uit een frontend, backend API en database, elk in hun eigen netwerk segment
+
+services:
+  # RentGuy Frontend
+  rentguy-frontend:
+    image: ${DOCKER_REGISTRY}/rentguy-frontend:latest
+    container_name: rentguy-frontend
+    environment:
+      - NODE_ENV=production
+      - API_URL=https://rentguy.sevensa.nl/api
+      - KEYCLOAK_URL=https://auth.sevensa.nl/auth
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=rentguy-app
+      - ONBOARDING_URL=https://onboarding.rentguy.sevensa.nl
+    networks:
+      - rentguy-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rentguy-frontend.rule=Host(`rentguy.sevensa.nl`)"
+      - "traefik.http.routers.rentguy-frontend.entrypoints=websecure"
+      - "traefik.http.routers.rentguy-frontend.tls=true"
+      - "traefik.http.routers.rentguy-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rentguy-frontend.loadbalancer.server.port=80"
+      # OIDC authenticatie middleware
+      - "traefik.http.routers.rentguy-frontend.middlewares=rentguy-auth"
+      - "traefik.http.middlewares.rentguy-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.rentguy-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email,X-Forwarded-Preferred-Username"
+      - "traefik.http.middlewares.rentguy-auth.forwardauth.trustForwardHeader=true"
+    restart: unless-stopped
+    depends_on:
+      - rentguy-api
+
+  # RentGuy Onboarding Frontend
+  rentguy-onboarding:
+    image: ${DOCKER_REGISTRY}/rentguy-onboarding:latest
+    container_name: rentguy-onboarding
+    environment:
+      - NODE_ENV=production
+      - API_URL=https://rentguy.sevensa.nl/api
+      - KEYCLOAK_URL=https://auth.sevensa.nl/auth
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=rentguy-app
+    networks:
+      - rentguy-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rentguy-onboarding.rule=Host(`onboarding.rentguy.sevensa.nl`)"
+      - "traefik.http.routers.rentguy-onboarding.entrypoints=websecure"
+      - "traefik.http.routers.rentguy-onboarding.tls=true"
+      - "traefik.http.routers.rentguy-onboarding.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rentguy-onboarding.loadbalancer.server.port=80"
+      # OIDC authenticatie middleware
+      - "traefik.http.routers.rentguy-onboarding.middlewares=rentguy-auth"
+    restart: unless-stopped
+    depends_on:
+      - rentguy-api
+
+  # RentGuy Backend API
+  rentguy-api:
+    image: ${DOCKER_REGISTRY}/rentguy-api:latest
+    container_name: rentguy-api
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Vault configuratie
+      - VAULT_ADDR=https://vault.sevensa.nl:8200
+      - VAULT_ROLE_ID=${VAULT_RENTGUY_ROLE_ID}
+      - VAULT_SECRET_ID=${VAULT_RENTGUY_SECRET_ID}
+      - VAULT_SKIP_VERIFY=true
+      # Minimale configuratie (rest komt uit Vault)
+      - KEYCLOAK_URL=https://auth.sevensa.nl/auth
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=rentguy-app
+      - CORS_ORIGINS=https://rentguy.sevensa.nl,https://onboarding.rentguy.sevensa.nl
+    volumes:
+      - rentguy-uploads:/app/uploads
+    networks:
+      - rentguy-net
+      - rentguy-db-net
+      - vault-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rentguy-api.rule=Host(`rentguy.sevensa.nl`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.rentguy-api.entrypoints=websecure"
+      - "traefik.http.routers.rentguy-api.tls=true"
+      - "traefik.http.routers.rentguy-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rentguy-api.loadbalancer.server.port=3000"
+      # JWT validatie middleware
+      - "traefik.http.routers.rentguy-api.middlewares=rentguy-api-auth"
+      - "traefik.http.middlewares.rentguy-api-auth.forwardauth.address=http://rentguy-auth-service:4000/validate"
+      - "traefik.http.middlewares.rentguy-api-auth.forwardauth.authResponseHeaders=X-User-ID,X-User-Email,X-User-Roles"
+      - "traefik.http.middlewares.rentguy-api-auth.forwardauth.trustForwardHeader=true"
+    restart: unless-stopped
+    depends_on:
+      - rentguy-db
+      - rentguy-redis
+      - rentguy-auth-service
+
+  # RentGuy Auth Service (JWT validatie en Keycloak integratie)
+  rentguy-auth-service:
+    image: ${DOCKER_REGISTRY}/rentguy-auth-service:latest
+    container_name: rentguy-auth-service
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      # Vault configuratie
+      - VAULT_ADDR=https://vault.sevensa.nl:8200
+      - VAULT_ROLE_ID=${VAULT_RENTGUY_ROLE_ID}
+      - VAULT_SECRET_ID=${VAULT_RENTGUY_SECRET_ID}
+      - VAULT_SKIP_VERIFY=true
+      # Minimale configuratie (rest komt uit Vault)
+      - KEYCLOAK_URL=https://auth.sevensa.nl/auth
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=rentguy-app
+    networks:
+      - rentguy-net
+      - keycloak-net
+      - vault-net
+    restart: unless-stopped
+
+  # RentGuy Database
+  rentguy-db:
+    image: postgres:14
+    container_name: rentguy-db
+    environment:
+      - POSTGRES_USER=rentguy
+      - POSTGRES_PASSWORD=${RENTGUY_DB_PASSWORD}
+      - POSTGRES_DB=rentguy
+    volumes:
+      - rentguy-db-data:/var/lib/postgresql/data
+      # Database initialisatie scripts
+      - ./rentguy/db-init:/docker-entrypoint-initdb.d
+    networks:
+      - rentguy-db-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentguy -d rentguy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # RentGuy Redis voor caching en sessies
+  rentguy-redis:
+    image: redis:7-alpine
+    container_name: rentguy-redis
+    command: redis-server --requirepass ${RENTGUY_REDIS_PASSWORD}
+    volumes:
+      - rentguy-redis-data:/data
+    networks:
+      - rentguy-db-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RentGuy Vault Agent voor secret management
+  rentguy-vault-agent:
+    image: hashicorp/vault:1.13.3
+    container_name: rentguy-vault-agent
+    command: agent -config=/vault/config/agent.hcl
+    environment:
+      - VAULT_ADDR=https://vault.sevensa.nl:8200
+      - VAULT_SKIP_VERIFY=true
+    volumes:
+      - ./vault/agent/rentguy:/vault/config
+    networks:
+      - rentguy-net
+      - vault-net
+    restart: unless-stopped
+    depends_on:
+      - rentguy-api
+
+networks:
+  rentguy-net:
+    external: true
+  rentguy-db-net:
+    external: true
+  keycloak-net:
+    external: true
+  vault-net:
+    external: true
+
+volumes:
+  rentguy-db-data:
+    name: rentguy-db-data
+  rentguy-redis-data:
+    name: rentguy-redis-data
+  rentguy-uploads:
+    name: rentguy-uploads

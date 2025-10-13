@@ -1,0 +1,62 @@
+[
+  {
+    "id": "PSRA-001",
+    "area": "security",
+    "severity": "high",
+    "location": "app/api/metrics/route.ts:1-21",
+    "persona": "n/a",
+    "description": "Prometheus metrics endpoint is exposed without authentication or throttling.",
+    "evidence": "export async function GET() {\n  try {\n    const queueStats = await taskQueue.getQueueStats()...\n    return new NextResponse(payload, { status: 200, headers: { 'Content-Type': metricsRegistry.contentType } });",
+    "impact": "Unauthorised users can scrape infrastructure metrics (queue status, service health), aiding reconnaissance or DoS timing.",
+    "fix": "Wrap the handler with auth middleware (e.g. require admin scope or signed token) and add rate limiting before returning metrics.",
+    "acceptance": [
+      "GET /api/metrics without admin token returns 401/403",
+      "Authenticated request logs metric access and enforces per-minute rate limits"
+    ]
+  },
+  {
+    "id": "PSRA-002",
+    "area": "security",
+    "severity": "medium",
+    "location": "app/api/health/route.ts:15-68",
+    "persona": "SysAdmin",
+    "description": "Health endpoint discloses environment configuration without access control.",
+    "evidence": "return NextResponse.json({\n    ok,\n    timestamp: now.toISOString(),\n    environment: {\n      nodeVersion: process.version,\n      redisUrl: config.redisUrl ? 'configured' : 'not-configured'",
+    "impact": "Attackers can probe enabled services (Redis, task queues) and exploit misconfigurations; suppliers should not see infra details.",
+    "fix": "Require authenticated admin session or signed webhook secret and strip environment metadata from unauthenticated responses.",
+    "acceptance": [
+      "Health route rejects unauthorised requests",
+      "Response hides redis/taric configuration unless admin scope present"
+    ]
+  },
+  {
+    "id": "PSRA-003",
+    "area": "performance",
+    "severity": "medium",
+    "location": "components/dashboard/DashboardStats.tsx:33-86",
+    "persona": "Analyst",
+    "description": "Dashboard stats poll four endpoints every 60s without abort/backoff handling.",
+    "evidence": "const [hs39Response, hs40Response, agreementsResponse, certificatesResponse] = await Promise.all([...fetch(...)...]);\nconst interval = setInterval(loadStats, 60000);",
+    "impact": "Under degraded networks or multi-tab use, polling can flood API and leave stale loaders, slowing onboarding.",
+    "fix": "Add AbortController cleanup, exponential backoff on failures, and persona-specific refresh cadence.",
+    "acceptance": [
+      "Polling stops when component unmounts or visibility changes",
+      "Retry strategy backs off after failures and resumes with capped frequency"
+    ]
+  },
+  {
+    "id": "PSRA-004",
+    "area": "onboarding",
+    "severity": "medium",
+    "location": "app/api/origin/calculate/route.ts:44-101",
+    "persona": "Compliance",
+    "description": "Origin calculation alternatives echo persona success criteria without validating actual material data.",
+    "evidence": "const alternatives = persona ? persona.successCriteria.map(criteria => ({ type: 'success-criteria', result: true, details: criteria })) : [];",
+    "impact": "Users may assume compliance rules passed even if uploaded BoM diverges from persona baseline, risking incorrect certificates during onboarding demos.",
+    "fix": "Recompute alternatives using material percentages and trade agreement thresholds (e.g. RVC, tariff shift) instead of blindly trusting persona text.",
+    "acceptance": [
+      "Alternatives reflect calculated pass/fail outcomes for the submitted BoM",
+      "Scenario deviations (e.g. HS mismatch) surface as warnings instead of auto-success"
+    ]
+  }
+]

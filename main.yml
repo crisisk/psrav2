@@ -1,0 +1,200 @@
+---
+# OpenBao Extension Role
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+- name: Create OpenBao directories
+  file:
+    path: "{{ project_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - openbao/policies
+    - openbao/logs
+
+- name: Copy policy files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ project_dir }}/openbao/policies/{{ item | basename }}"
+    mode: "0644"
+  loop:
+    - "{{ role_path }}/files/policies/admin-policy.hcl"
+    - "{{ role_path }}/files/policies/rentguy-policy.hcl"
+    - "{{ role_path }}/files/policies/psra-policy.hcl"
+    - "{{ role_path }}/files/policies/wpcs-policy.hcl"
+    - "{{ role_path }}/files/policies/ai-policy.hcl"
+
+- name: Template extended bootstrap script
+  template:
+    src: "bootstrap_init_openbao_extended.sh.j2"
+    dest: "{{ project_dir }}/openbao/bootstrap_init_openbao_extended.sh"
+    mode: "0755"
+  vars:
+    namespaces:
+      - sevensa
+      - rentguy
+      - psra
+      - wpcs
+      - ai
+
+- name: Copy policy files to OpenBao container
+  shell: |
+    docker compose cp {{ project_dir }}/openbao/policies/ openbao:/opt/bao/
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Run extended bootstrap script
+  shell: |
+    cd {{ project_dir }} && ./openbao/bootstrap_init_openbao_extended.sh
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Configure database secret engine for RentGuy
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="rentguy"
+    
+    # Configure PostgreSQL connection for RentGuy
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/config/rentguy-db \
+      plugin_name=postgresql-database-plugin \
+      allowed_roles=\"rentguy-role\" \
+      connection_url=\"postgresql://{{username}}:{{password}}@rentguy-db:5432/rentguy?sslmode=disable\" \
+      username=\"vault\" \
+      password=\"${RENTGUY_DB_ADMIN_PASSWORD}\"" || true
+    
+    # Create role for RentGuy database credentials
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/roles/rentguy-role \
+      db_name=rentguy-db \
+      creation_statements=\"CREATE ROLE \\\"{{name}}\\\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+                          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \\\"{{name}}\\\";\" \
+      default_ttl=\"1h\" \
+      max_ttl=\"24h\"" || true
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    RENTGUY_DB_ADMIN_PASSWORD: "{{ lookup('env', 'RENTGUY_DB_ADMIN_PASSWORD') | default('changeme-rentguy-db', true) }}"
+
+- name: Configure database secret engine for PSRA
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="psra"
+    
+    # Configure PostgreSQL connection for PSRA
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/config/psra-db \
+      plugin_name=postgresql-database-plugin \
+      allowed_roles=\"psra-role\" \
+      connection_url=\"postgresql://{{username}}:{{password}}@psra-db:5432/psra?sslmode=disable\" \
+      username=\"vault\" \
+      password=\"${PSRA_DB_ADMIN_PASSWORD}\"" || true
+    
+    # Create role for PSRA database credentials
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/roles/psra-role \
+      db_name=psra-db \
+      creation_statements=\"CREATE ROLE \\\"{{name}}\\\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
+                          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \\\"{{name}}\\\";\" \
+      default_ttl=\"1h\" \
+      max_ttl=\"24h\"" || true
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    PSRA_DB_ADMIN_PASSWORD: "{{ lookup('env', 'PSRA_DB_ADMIN_PASSWORD') | default('changeme-psra-db', true) }}"
+
+- name: Configure database secret engine for WPCS
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="wpcs"
+    
+    # Configure MySQL connection for WPCS
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/config/wpcs-db \
+      plugin_name=mysql-database-plugin \
+      allowed_roles=\"wpcs-role\" \
+      connection_url=\"{{username}}:{{password}}@tcp(wpcs-db:3306)/\" \
+      username=\"vault\" \
+      password=\"${WPCS_DB_ADMIN_PASSWORD}\"" || true
+    
+    # Create role for WPCS database credentials
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao write database/roles/wpcs-role \
+      db_name=wpcs-db \
+      creation_statements=\"CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}'; \
+                          GRANT SELECT, INSERT, UPDATE, DELETE ON wpcs.* TO '{{name}}'@'%';\" \
+      default_ttl=\"1h\" \
+      max_ttl=\"24h\"" || true
+  args:
+    chdir: "{{ project_dir }}"
+  environment:
+    WPCS_DB_ADMIN_PASSWORD: "{{ lookup('env', 'WPCS_DB_ADMIN_PASSWORD') | default('changeme-wpcs-db', true) }}"
+
+- name: Create initial secrets for RentGuy
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="rentguy"
+    
+    # Create initial secrets
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-rentguy/config/app-config \
+      environment=production \
+      debug=false \
+      log_level=info" || true
+    
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-rentguy/smtp/credentials \
+      host=smtp.example.com \
+      port=587 \
+      username=rentguy@example.com \
+      password=changeme-smtp-password" || true
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Create initial secrets for PSRA
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="psra"
+    
+    # Create initial secrets
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-psra/config/app-config \
+      environment=production \
+      debug=false \
+      log_level=info" || true
+    
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-psra/integration/external-services \
+      erp_api_url=https://erp.example.com/api \
+      erp_api_key=changeme-erp-api-key" || true
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Create initial secrets for WPCS
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="wpcs"
+    
+    # Create initial secrets
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-wpcs/config/app-config \
+      environment=production \
+      debug=false \
+      log_level=info" || true
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Create initial secrets for AI Orchestration
+  shell: |
+    export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+    export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+    export VAULT_NAMESPACE="ai"
+    
+    # Create initial secrets
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-ai/config/app-config \
+      environment=production \
+      debug=false \
+      log_level=info" || true
+    
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-ai/api-keys/openai \
+      api_key=changeme-openai-api-key" || true
+    
+    docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$VAULT_NAMESPACE; bao kv put kv-ai/api-keys/anthropic \
+      api_key=changeme-anthropic-api-key" || true
+  args:
+    chdir: "{{ project_dir }}"

@@ -1,0 +1,205 @@
+name: LangGraph Origin Engine CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'implementation/phase1/origin_engine/**'
+      - 'implementation/phase3/kubernetes/base/langgraph/**'
+      - 'implementation/phase3/kubernetes/overlays/*/langgraph/**'
+      - '.github/workflows/langgraph-origin-engine-ci-cd.yaml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'implementation/phase1/origin_engine/**'
+      - 'implementation/phase3/kubernetes/base/langgraph/**'
+      - 'implementation/phase3/kubernetes/overlays/*/langgraph/**'
+      - '.github/workflows/langgraph-origin-engine-ci-cd.yaml'
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: psra-ltsd/langgraph-origin-engine
+  KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort mypy
+          pip install -r implementation/phase1/origin_engine/requirements.txt
+
+      - name: Run flake8
+        run: |
+          flake8 implementation/phase1/origin_engine
+
+      - name: Run black
+        run: |
+          black --check implementation/phase1/origin_engine
+
+      - name: Run isort
+        run: |
+          isort --check implementation/phase1/origin_engine
+
+      - name: Run mypy
+        run: |
+          mypy implementation/phase1/origin_engine
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          pip install -r implementation/phase1/origin_engine/requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest implementation/phase1/origin_engine/tests --cov=implementation/phase1/origin_engine --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
+
+  build:
+    name: Build and Push
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./implementation/phase1/origin_engine
+          file: ./implementation/phase1/origin_engine/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: scan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_DATA }}
+
+      - name: Update kustomization.yaml
+        run: |
+          cd implementation/phase3/kubernetes/overlays/dev
+          kustomize edit set image ${DOCKER_REGISTRY}/${IMAGE_NAME}=${DOCKER_REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA::7}
+
+      - name: Deploy to dev
+        run: |
+          kubectl apply -k implementation/phase3/kubernetes/overlays/dev
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/langgraph-origin-engine -n psra-system-dev --timeout=300s
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_DATA }}
+
+      - name: Update kustomization.yaml
+        run: |
+          cd implementation/phase3/kubernetes/overlays/prod
+          kustomize edit set image ${DOCKER_REGISTRY}/${IMAGE_NAME}=${DOCKER_REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA::7}
+
+      - name: Deploy to production
+        run: |
+          kubectl apply -k implementation/phase3/kubernetes/overlays/prod
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/langgraph-origin-engine -n psra-system --timeout=300s

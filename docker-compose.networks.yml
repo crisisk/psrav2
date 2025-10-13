@@ -1,0 +1,115 @@
+version: '3.8'
+
+# Dit bestand definieert alle Docker netwerken voor de Zero-Trust Network Access implementatie
+# Elk service-domein heeft zijn eigen geïsoleerd netwerk
+# Alleen Traefik heeft toegang tot alle service-netwerken voor routering
+
+networks:
+  # Hoofdnetwerk voor Traefik reverse proxy
+  traefik-net:
+    name: traefik-net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/24
+    
+  # RentGuy service netwerk
+  rentguy-net:
+    name: rentguy-net
+    driver: bridge
+    internal: true  # Geen directe externe toegang
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.1.0/24
+  
+  # RentGuy database netwerk (alleen toegankelijk voor RentGuy services)
+  rentguy-db-net:
+    name: rentguy-db-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.2.0/24
+  
+  # PSRA service netwerk
+  psra-net:
+    name: psra-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.3.0/24
+  
+  # PSRA database netwerk
+  psra-db-net:
+    name: psra-db-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.4.0/24
+  
+  # WPCS service netwerk
+  wpcs-net:
+    name: wpcs-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.5.0/24
+  
+  # WPCS database netwerk
+  wpcs-db-net:
+    name: wpcs-db-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.6.0/24
+  
+  # AI Orchestration service netwerk
+  ai-net:
+    name: ai-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.7.0/24
+  
+  # Keycloak IdP netwerk
+  keycloak-net:
+    name: keycloak-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.8.0/24
+  
+  # Monitoring netwerk (Prometheus, Grafana)
+  monitoring-net:
+    name: monitoring-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.9.0/24
+  
+  # Logging netwerk (ELK stack)
+  logging-net:
+    name: logging-net
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.10.0/24

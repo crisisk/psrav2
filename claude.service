@@ -1,0 +1,15 @@
+Description=Claude VPS Chat Interface
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/infra/apps/claude-chat
+ExecStart=/infra/apps/claude-chat/venv/bin/python app.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/claude-chat/app.log
+StandardError=append:/var/log/claude-chat/error.log
+
+[Install]
+WantedBy=multi-user.target

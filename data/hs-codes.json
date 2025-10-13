@@ -1,0 +1,182 @@
+[
+  {
+    "code": "271019",
+    "chapter": "27",
+    "description": "Petroleum oils and oils obtained from bituminous minerals"
+  },
+  {
+    "code": "290211",
+    "chapter": "29",
+    "description": "Propylene"
+  },
+  {
+    "code": "381220",
+    "chapter": "38",
+    "description": "Compound plasticisers for rubber or plastics"
+  },
+  {
+    "code": "381230",
+    "chapter": "38",
+    "description": "Anti-oxidising preparations and stabilisers"
+  },
+  {
+    "code": "390110",
+    "chapter": "39",
+    "description": "Polyethylene having a specific gravity < 0.94"
+  },
+  {
+    "code": "390120",
+    "chapter": "39",
+    "description": "Polyethylene having a specific gravity >= 0.94"
+  },
+  {
+    "code": "390760",
+    "chapter": "39",
+    "description": "Poly(ethylene terephthalate) in primary forms"
+  },
+  {
+    "code": "400110",
+    "chapter": "40",
+    "description": "Natural rubber latex"
+  },
+  {
+    "code": "400122",
+    "chapter": "40",
+    "description": "Technically specified natural rubber (TSNR)"
+  },
+  {
+    "code": "401699",
+    "chapter": "40",
+    "description": "Articles of vulcanised rubber n.e.s."
+  },
+  {
+    "code": "482110",
+    "chapter": "48",
+    "description": "Labels of all kinds, of paper or paperboard"
+  },
+  {
+    "code": "480255",
+    "chapter": "48",
+    "description": "Other paper and paperboard, multi-ply"
+  },
+  {
+    "code": "492099",
+    "chapter": "49",
+    "description": "Other printed matter"
+  },
+  {
+    "code": "720712",
+    "chapter": "72",
+    "description": "Semi-finished products of iron or non-alloy steel"
+  },
+  {
+    "code": "720851",
+    "chapter": "72",
+    "description": "Flat-rolled products of iron or non-alloy steel"
+  },
+  {
+    "code": "720915",
+    "chapter": "72",
+    "description": "Flat-rolled products of stainless steel, width >= 600mm"
+  },
+  {
+    "code": "720852",
+    "chapter": "72",
+    "description": "Flat-rolled products of iron or non-alloy steel, width >= 600mm"
+  },
+  {
+    "code": "730890",
+    "chapter": "73",
+    "description": "Structures and parts of structures, of iron or steel"
+  },
+  {
+    "code": "830249",
+    "chapter": "83",
+    "description": "Base metal mountings, fittings and similar articles"
+  },
+  {
+    "code": "840140",
+    "chapter": "84",
+    "description": "Auxiliary plant for use with boilers"
+  },
+  {
+    "code": "845522",
+    "chapter": "84",
+    "description": "Metal-rolling mills and rolls therefor"
+  },
+  {
+    "code": "850300",
+    "chapter": "85",
+    "description": "Parts suitable for use solely with electric motors"
+  },
+  {
+    "code": "850440",
+    "chapter": "85",
+    "description": "Static converters"
+  },
+  {
+    "code": "850490",
+    "chapter": "85",
+    "description": "Parts suitable for static converters"
+  },
+  {
+    "code": "853225",
+    "chapter": "85",
+    "description": "Fixed capacitors for 50/60 Hz circuits"
+  },
+  {
+    "code": "854140",
+    "chapter": "85",
+    "description": "Photosensitive semiconductor devices"
+  },
+  {
+    "code": "854190",
+    "chapter": "85",
+    "description": "Parts of electrical machines and apparatus"
+  },
+  {
+    "code": "903031",
+    "chapter": "90",
+    "description": "Multimeters"
+  },
+  {
+    "code": "903089",
+    "chapter": "90",
+    "description": "Instruments for measuring or checking electrical quantities"
+  },
+  {
+    "code": "903180",
+    "chapter": "90",
+    "description": "Instruments for measuring or checking n.e.s."
+  },
+  {
+    "code": "940510",
+    "chapter": "94",
+    "description": "Chandeliers and other electric ceiling lighting fittings"
+  },
+  {
+    "code": "940540",
+    "chapter": "94",
+    "description": "Electric lamps and lighting fittings"
+  },
+  {
+    "code": "940592",
+    "chapter": "94",
+    "description": "Parts of lamps and lighting fittings"
+  },
+  {
+    "code": "321590",
+    "chapter": "32",
+    "description": "Colour lakes; preparations based on colouring matters"
+  },
+  {
+    "code": "392099",
+    "chapter": "39",
+    "description": "Plates, sheets, film, foil and strip, of plastics, n.e.s."
+  },
+  {
+    "code": "902710",
+    "chapter": "90",
+    "description": "Gas or smoke analysis apparatus"
+  }
+]

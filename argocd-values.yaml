@@ -1,0 +1,191 @@
+global:
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+
+server:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.middlewares: sevensa-security-oauth2@kubernetescrd
+    hosts:
+      - argocd.sevensa.nl
+    tls:
+      - secretName: argocd-tls
+        hosts:
+          - argocd.sevensa.nl
+  config:
+    url: https://argocd.sevensa.nl
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    timeout.reconciliation: 180s
+    resource.customizations: |
+      networking.k8s.io/Ingress:
+        health.lua: |
+          hs = {}
+          hs.status = "Healthy"
+          return hs
+    configManagementPlugins: |
+      - name: kustomize-build
+        init:
+          command: ["/bin/sh", "-c"]
+          args: ["kustomize version"]
+        generate:
+          command: ["/bin/sh", "-c"]
+          args: ["kustomize build"]
+    dex.config: |
+      connectors:
+        - type: oidc
+          id: keycloak
+          name: Keycloak
+          config:
+            issuer: https://keycloak.sevensa.nl/auth/realms/sevensa
+            clientID: argocd
+            clientSecret: $keycloak-client-secret
+            requestedScopes: ["openid", "profile", "email", "groups"]
+    resource.exclusions: |
+      - apiGroups:
+        - cilium.io
+        kinds:
+        - CiliumNetworkPolicy
+        clusters:
+        - "*"
+
+repoServer:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+applicationSet:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+dex:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+configs:
+  secret:
+    argocdServerAdminPassword: $2a$10$mivhwttXM0U5eBrZGtAG8.ztIH3F1wUfJHmLH4iJFAu6iKmWQRXP6  # bcrypt hash of 'admin'
+    createSecret: true
+
+  cm:
+    admin.enabled: true
+    statusbadge.enabled: true
+    resource.compareoptions: |
+      ignoreAggregatedRoles: true
+    application.resourceTrackingMethod: annotation+label
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:org-admin, applications, *, */*, allow
+      p, role:org-admin, clusters, get, *, allow
+      p, role:org-admin, repositories, get, *, allow
+      p, role:org-admin, repositories, create, *, allow
+      p, role:org-admin, repositories, update, *, allow
+      p, role:org-admin, repositories, delete, *, allow
+      g, sevensa-admin, role:org-admin
+
+  repositories:
+    sevensa-infrastructure:
+      url: https://github.com/sevensa/sevensa-infrastructure.git
+      type: git
+      insecure: false
+      githubAppId: ""
+      githubAppInstallationId: ""
+      githubAppPrivateKey: ""
+      enableLfs: false
+      proxy: ""
+
+  applicationsets:
+    sevensa-applications:
+      metadata:
+        name: sevensa-applications
+        namespace: argocd
+      spec:
+        generators:
+          - git:
+              repoURL: https://github.com/sevensa/sevensa-infrastructure.git
+              revision: HEAD
+              directories:
+                - path: kubernetes/applications/*
+        template:
+          metadata:
+            name: '{{path.basename}}'
+          spec:
+            project: default
+            source:
+              repoURL: https://github.com/sevensa/sevensa-infrastructure.git
+              targetRevision: HEAD
+              path: '{{path}}'
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: '{{path.basename}}'
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+                - CreateNamespace=true

@@ -1,0 +1,53 @@
+version: '3.8'
+
+# Docker Compose Configuration for OpenBao with Network Segmentation
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+services:
+  # OpenBao - Secret Management
+  openbao:
+    image: openbao/openbao:latest
+    container_name: openbao
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+      - VAULT_UI=true
+    volumes:
+      - openbao-data:/opt/bao/data
+      - openbao-logs:/opt/bao/logs
+      - openbao-policies:/opt/bao/policies
+      - openbao-config:/opt/bao/config
+    ports:
+      - "${BAO_HTTP_PORT:-8200}:8200"
+    networks:
+      - openbao_network
+      - shared_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/v1/sys/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: server -config=/opt/bao/config/openbao.hcl
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openbao.rule=Host(`vault.sevensa.nl`)"
+      - "traefik.http.routers.openbao.entrypoints=websecure"
+      - "traefik.http.routers.openbao.tls=true"
+      - "traefik.http.services.openbao.loadbalancer.server.port=8200"
+      - "traefik.http.routers.openbao.middlewares=oauth2-auth@file"
+
+volumes:
+  openbao-data:
+  openbao-logs:
+  openbao-policies:
+  openbao-config:
+
+networks:
+  openbao_network:
+    external: true
+  shared_network:
+    external: true

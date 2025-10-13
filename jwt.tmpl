@@ -1,0 +1,7 @@
+{
+  "secret": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.jwt_secret }}{{ end }}",
+  "expiresIn": "1h",
+  "algorithm": "HS256",
+  "issuer": "rentguy.sevensa.nl",
+  "audience": "rentguy-api"
+}

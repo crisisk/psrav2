@@ -1,0 +1,48 @@
+name: Build & Deploy to Sevensa VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}:latest
+  NAMESPACE: sevensa
+  DEPLOYMENT: psra-new
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+      - name: Write kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+      - name: Update/rollout
+        run: |
+          set -euxo pipefail
+          if kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" >/dev/null 2>&1; then
+            kubectl -n "$NAMESPACE" set image deployment/$DEPLOYMENT web=$IMAGE
+          else
+            kubectl -n "$NAMESPACE" create deployment $DEPLOYMENT --image=$IMAGE --port=3000
+          fi
+          kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT --timeout=120s

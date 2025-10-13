@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rentguy-api
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+    component: api
+spec:
+  selector:
+    app: rentguy
+    component: api
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rentguy-frontend
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+    component: frontend
+spec:
+  selector:
+    app: rentguy
+    component: frontend
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  type: ClusterIP

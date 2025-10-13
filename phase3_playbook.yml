@@ -1,0 +1,178 @@
+# Ansible Playbook for Phase 3: Centralized Logging & Monitoring
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+---
+- name: Deploy Centralized Logging & Monitoring
+  hosts: vps
+  become: true
+  vars_files:
+    - ../vars/monitoring.yml
+    - ../vars/secrets.yml
+  
+  pre_tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Docker if not installed
+      block:
+        - name: Install required packages
+          apt:
+            name:
+              - apt-transport-https
+              - ca-certificates
+              - curl
+              - gnupg
+              - lsb-release
+            state: present
+            update_cache: yes
+
+        - name: Add Docker GPG key
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Add Docker repository
+          apt_repository:
+            repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+            state: present
+
+        - name: Install Docker
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+            update_cache: yes
+      when: docker_check.rc != 0
+
+    - name: Check if Docker Compose is installed
+      command: docker-compose --version
+      register: docker_compose_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Docker Compose if not installed
+      block:
+        - name: Download Docker Compose
+          get_url:
+            url: https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-linux-x86_64
+            dest: /usr/local/bin/docker-compose
+            mode: '0755'
+      when: docker_compose_check.rc != 0
+
+    - name: Create monitoring directory
+      file:
+        path: "{{ monitoring_base_dir }}"
+        state: directory
+        mode: '0755'
+
+  roles:
+    - role: monitoring
+
+  tasks:
+    - name: Check if monitoring services are running
+      command: docker ps --format '{{ '{{' }}.Names{{ '}}' }}' --filter "name=prometheus|grafana|alertmanager|loki|promtail|vector"
+      register: monitoring_services
+      changed_when: false
+
+    - name: Display running monitoring services
+      debug:
+        msg: "Running monitoring services: {{ monitoring_services.stdout_lines }}"
+
+    - name: Check Prometheus status
+      uri:
+        url: http://localhost:9090/-/ready
+        status_code: 200
+      register: prometheus_status
+      ignore_errors: true
+
+    - name: Check Grafana status
+      uri:
+        url: http://localhost:3000/api/health
+        status_code: 200
+      register: grafana_status
+      ignore_errors: true
+
+    - name: Check Loki status
+      uri:
+        url: http://localhost:3100/ready
+        status_code: 200
+      register: loki_status
+      ignore_errors: true
+
+    - name: Display monitoring services status
+      debug:
+        msg: |
+          Prometheus status: {{ 'OK' if prometheus_status.status == 200 else 'FAIL' }}
+          Grafana status: {{ 'OK' if grafana_status.status == 200 else 'FAIL' }}
+          Loki status: {{ 'OK' if loki_status.status == 200 else 'FAIL' }}
+
+    - name: Configure service exporters
+      include_role:
+        name: service_exporters
+      vars:
+        service_name: "{{ item }}"
+      loop:
+        - rentguy
+        - psra
+        - wpcs
+        - ai
+
+    - name: Configure database exporters
+      include_role:
+        name: database_exporters
+      vars:
+        database_type: "{{ item.type }}"
+        database_name: "{{ item.name }}"
+      loop:
+        - { type: postgresql, name: rentguy }
+        - { type: postgresql, name: psra }
+        - { type: mysql, name: wpcs }
+        - { type: postgresql, name: ai }
+
+    - name: Configure structured logging for services
+      include_role:
+        name: structured_logging
+      vars:
+        service_name: "{{ item }}"
+      loop:
+        - rentguy
+        - psra
+        - wpcs
+        - ai
+
+  post_tasks:
+    - name: Verify monitoring setup
+      uri:
+        url: "{{ item.url }}"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 5
+      delay: 5
+      loop:
+        - { url: "http://localhost:9090/-/ready", name: "Prometheus" }
+        - { url: "http://localhost:3000/api/health", name: "Grafana" }
+        - { url: "http://localhost:3100/ready", name: "Loki" }
+        - { url: "http://localhost:9093/-/ready", name: "AlertManager" }
+
+    - name: Display monitoring URLs
+      debug:
+        msg: |
+          Monitoring setup completed successfully!
+          
+          Access the monitoring services at:
+          - Prometheus: https://prometheus.sevensa.nl
+          - Grafana: https://grafana.sevensa.nl
+          - AlertManager: https://alertmanager.sevensa.nl
+          - Loki: https://loki.sevensa.nl
+          
+          Default credentials:
+          - Username: {{ grafana_admin_user }}
+          - Password: {{ grafana_admin_password }}
+      no_log: true

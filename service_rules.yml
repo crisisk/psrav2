@@ -1,0 +1,102 @@
+groups:
+- name: service_alerts
+  rules:
+  # Alert voor service down
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service {{ $labels.instance }} ({{ $labels.service }}) is down"
+      description: "Service has been down for more than 1 minute.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge HTTP 4xx error rate
+  - alert: HighHttp4xxErrorRate
+    expr: sum(rate(http_requests_total{status=~"4.."}[5m])) by (instance, service) / sum(rate(http_requests_total[5m])) by (instance, service) * 100 > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High HTTP 4xx error rate on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "HTTP 4xx error rate is above 5% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge HTTP 5xx error rate
+  - alert: HighHttp5xxErrorRate
+    expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (instance, service) / sum(rate(http_requests_total[5m])) by (instance, service) * 100 > 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High HTTP 5xx error rate on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "HTTP 5xx error rate is above 1% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge HTTP latency
+  - alert: HighHttpLatency
+    expr: http_request_duration_seconds{quantile="0.9"} > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High HTTP latency on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "HTTP request latency (90th percentile) is above 1 second for more than 5 minutes.\n  VALUE = {{ $value }}s\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge database query latency
+  - alert: HighDatabaseQueryLatency
+    expr: db_query_duration_seconds{quantile="0.9"} > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database query latency on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "Database query latency (90th percentile) is above 1 second for more than 5 minutes.\n  VALUE = {{ $value }}s\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge database error rate
+  - alert: HighDatabaseErrorRate
+    expr: sum(rate(db_query_errors_total[5m])) by (instance, service) / sum(rate(db_query_total[5m])) by (instance, service) * 100 > 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High database error rate on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "Database error rate is above 1% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge Redis latency
+  - alert: HighRedisLatency
+    expr: redis_command_duration_seconds{quantile="0.9"} > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Redis latency on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "Redis command latency (90th percentile) is above 0.1 second for more than 5 minutes.\n  VALUE = {{ $value }}s\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge Redis error rate
+  - alert: HighRedisErrorRate
+    expr: sum(rate(redis_command_errors_total[5m])) by (instance, service) / sum(rate(redis_command_total[5m])) by (instance, service) * 100 > 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High Redis error rate on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "Redis error rate is above 1% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge API error rate
+  - alert: HighApiErrorRate
+    expr: sum(rate(api_requests_errors_total[5m])) by (instance, service) / sum(rate(api_requests_total[5m])) by (instance, service) * 100 > 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High API error rate on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "API error rate is above 1% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor service health check failures
+  - alert: ServiceHealthCheckFailure
+    expr: health_check_status == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Health check failure on {{ $labels.instance }} ({{ $labels.service }})"
+      description: "Health check has been failing for more than 1 minute.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

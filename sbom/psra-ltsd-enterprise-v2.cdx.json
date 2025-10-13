@@ -1,0 +1,53 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2024-08-01T00:00:00Z",
+    "tools": [
+      {
+        "vendor": "Anchore",
+        "name": "Syft",
+        "version": "1.16.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "psra-ltsd-enterprise-v2",
+      "version": "0.0.0-unreleased",
+      "bom-ref": "pkg:npm/psra-ltsd-enterprise-v2@0.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "next",
+      "version": "14.2.5",
+      "purl": "pkg:npm/next@14.2.5"
+    },
+    {
+      "type": "library",
+      "name": "react",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react@18.3.1"
+    },
+    {
+      "type": "library",
+      "name": "react-dom",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react-dom@18.3.1"
+    },
+    {
+      "type": "library",
+      "name": "zod",
+      "version": "3.23.8",
+      "purl": "pkg:npm/zod@3.23.8"
+    },
+    {
+      "type": "library",
+      "name": "pg",
+      "version": "8.11.3",
+      "purl": "pkg:npm/pg@8.11.3"
+    }
+  ]
+}

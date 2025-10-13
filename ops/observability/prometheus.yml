@@ -1,0 +1,187 @@
+# Prometheus Configuration for PSRA-LTSD Enterprise
+# This configuration defines scrape targets, retention policies, and service discovery
+
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 15s
+
+  # How long until a scrape request times out
+  scrape_timeout: 10s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # External labels to add to all metrics
+  external_labels:
+    cluster: 'psra-ltsd-enterprise'
+    environment: 'production'
+    region: 'us-east-1'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - 'prometheus_alerts.yml'
+
+# Storage retention configuration
+storage:
+  tsdb:
+    # How long to retain data (default: 15 days)
+    retention.time: 30d
+
+    # Maximum storage size (oldest data removed first)
+    retention.size: 50GB
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # PSRA-LTSD Main API Service
+  - job_name: 'psra-ltsd-api'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'psra-ltsd-api:8000'
+        labels:
+          service: 'psra-ltsd-api'
+          component: 'backend'
+    # Relabel to extract service metadata
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [__address__]
+        regex: '([^:]+).*'
+        target_label: host
+        replacement: '$1'
+
+  # LTSD Service (Microservice)
+  - job_name: 'ltsd-service'
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - 'ltsd-service:8001'
+        labels:
+          service: 'ltsd-service'
+          component: 'microservice'
+
+  # Celery Workers (if exposed via prometheus-client)
+  - job_name: 'celery-workers'
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - 'celery-worker-1:9091'
+          - 'celery-worker-2:9091'
+          - 'celery-worker-3:9091'
+        labels:
+          service: 'celery-worker'
+          component: 'async-tasks'
+
+  # PostgreSQL Exporter
+  - job_name: 'postgresql'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+        labels:
+          service: 'postgresql'
+          component: 'database'
+          database: 'psra_ltsd'
+
+  # Redis Exporter
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'redis-exporter:9121'
+        labels:
+          service: 'redis'
+          component: 'cache'
+
+  # Node Exporter (System metrics)
+  - job_name: 'node-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+        labels:
+          service: 'node-exporter'
+          component: 'infrastructure'
+
+  # Kubernetes Service Discovery (if running on K8s)
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      # Only scrape pods with prometheus.io/scrape annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Use custom metrics path if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Use custom port if specified
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      # Add pod metadata as labels
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+
+  # Docker Service Discovery (if running via Docker Compose)
+  - job_name: 'docker-services'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 30s
+    relabel_configs:
+      # Only scrape containers with prometheus label
+      - source_labels: [__meta_docker_container_label_prometheus_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_docker_container_label_prometheus_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: __meta_docker_container_network_ip:$1
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name
+        regex: /(.+)
+        replacement: $1
+
+# Remote write configuration (optional - for long-term storage)
+# remote_write:
+#   - url: "https://prometheus-remote-storage.example.com/api/v1/write"
+#     basic_auth:
+#       username: "prometheus"
+#       password_file: "/etc/prometheus/remote_write_password"
+#     queue_config:
+#       max_samples_per_send: 10000
+#       max_shards: 10
+#       capacity: 50000
+
+# Remote read configuration (optional)
+# remote_read:
+#   - url: "https://prometheus-remote-storage.example.com/api/v1/read"
+#     basic_auth:
+#       username: "prometheus"
+#       password_file: "/etc/prometheus/remote_read_password"

@@ -1,0 +1,128 @@
+version: '3.8'
+
+# Docker Compose Configuration for PSRA with Network Segmentation
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+services:
+  # PSRA Frontend
+  psra-frontend:
+    image: sevensa/psra-frontend:latest
+    container_name: psra-frontend
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://psra-api:3000
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=psra-client
+    networks:
+      - psra_network
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.psra-frontend.rule=Host(`psra.sevensa.nl`)"
+      - "traefik.http.routers.psra-frontend.entrypoints=websecure"
+      - "traefik.http.routers.psra-frontend.tls=true"
+      - "traefik.http.services.psra-frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.psra-frontend.middlewares=oauth2-auth@file"
+
+  # PSRA API
+  psra-api:
+    image: sevensa/psra-api:latest
+    container_name: psra-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://psra:${PSRA_DB_PASSWORD}@psra-db:5432/psra_production
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=psra
+      - VAULT_ROLE_ID=${PSRA_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${PSRA_VAULT_SECRET_ID}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=psra-client
+      - KEYCLOAK_CLIENT_SECRET=${PSRA_CLIENT_SECRET}
+      - LANGGRAPH_URL=http://langgraph:8000
+    networks:
+      - psra_network
+      - shared_network
+    depends_on:
+      - psra-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.psra-api.rule=Host(`api.psra.sevensa.nl`)"
+      - "traefik.http.routers.psra-api.entrypoints=websecure"
+      - "traefik.http.routers.psra-api.tls=true"
+      - "traefik.http.services.psra-api.loadbalancer.server.port=3000"
+      - "traefik.http.routers.psra-api.middlewares=oauth2-auth@file"
+
+  # PSRA Database
+  psra-db:
+    image: postgres:14-alpine
+    container_name: psra-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=psra
+      - POSTGRES_PASSWORD=${PSRA_DB_PASSWORD}
+      - POSTGRES_DB=psra_production
+    volumes:
+      - psra-db-data:/var/lib/postgresql/data
+    networks:
+      - psra_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PSRA Redis
+  psra-redis:
+    image: redis:7-alpine
+    container_name: psra-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${PSRA_REDIS_PASSWORD}
+    volumes:
+      - psra-redis-data:/data
+    networks:
+      - psra_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PSRA Origin Calculation Engine (LangGraph)
+  psra-origin-engine:
+    image: sevensa/psra-origin-engine:latest
+    container_name: psra-origin-engine
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://psra-redis:6379
+      - REDIS_PASSWORD=${PSRA_REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://psra:${PSRA_DB_PASSWORD}@psra-db:5432/psra
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=psra
+      - VAULT_ROLE_ID=${PSRA_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${PSRA_VAULT_SECRET_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - psra_network
+      - shared_network
+    depends_on:
+      - psra-db
+      - psra-redis
+
+volumes:
+  psra-db-data:
+  psra-redis-data:
+
+networks:
+  psra_network:
+    external: true
+  traefik_network:
+    external: true
+  shared_network:
+    external: true

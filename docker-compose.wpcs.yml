@@ -1,0 +1,129 @@
+version: '3.8'
+
+# Docker Compose Configuration for WPCS with Network Segmentation
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+services:
+  # WPCS API
+  wpcs-api:
+    image: sevensa/wpcs-api:latest
+    container_name: wpcs-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://wpcs:${WPCS_DB_PASSWORD}@wpcs-db:3306/wpcs
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=wpcs
+      - VAULT_ROLE_ID=${WPCS_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${WPCS_VAULT_SECRET_ID}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=wpcs-client
+      - KEYCLOAK_CLIENT_SECRET=${WPCS_CLIENT_SECRET}
+    networks:
+      - wpcs_network
+      - traefik_network
+      - shared_network
+    depends_on:
+      - wpcs-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wpcs-api.rule=Host(`wpcs.sevensa.nl`)"
+      - "traefik.http.routers.wpcs-api.entrypoints=websecure"
+      - "traefik.http.routers.wpcs-api.tls=true"
+      - "traefik.http.services.wpcs-api.loadbalancer.server.port=3000"
+      - "traefik.http.routers.wpcs-api.middlewares=oauth2-auth@file"
+
+  # WPCS Database
+  wpcs-db:
+    image: mysql:8
+    container_name: wpcs-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${WPCS_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=wpcs
+      - MYSQL_USER=wpcs
+      - MYSQL_PASSWORD=${WPCS_DB_PASSWORD}
+    volumes:
+      - wpcs-db-data:/var/lib/mysql
+    networks:
+      - wpcs_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "wpcs", "-p${WPCS_DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WPCS Redis
+  wpcs-redis:
+    image: redis:7-alpine
+    container_name: wpcs-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${WPCS_REDIS_PASSWORD}
+    volumes:
+      - wpcs-redis-data:/data
+    networks:
+      - wpcs_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WPCS Malware Scanner
+  wpcs-malware-scanner:
+    image: sevensa/wpcs-malware-scanner:latest
+    container_name: wpcs-malware-scanner
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=mysql://wpcs:${WPCS_DB_PASSWORD}@wpcs-db:3306/wpcs
+      - REDIS_URL=redis://wpcs-redis:6379
+      - REDIS_PASSWORD=${WPCS_REDIS_PASSWORD}
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=wpcs
+      - VAULT_ROLE_ID=${WPCS_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${WPCS_VAULT_SECRET_ID}
+    volumes:
+      - wpcs-sites:/var/www/html
+    networks:
+      - wpcs_network
+      - shared_network
+    depends_on:
+      - wpcs-db
+      - wpcs-redis
+
+  # WPCS Staging Sync
+  wpcs-staging-sync:
+    image: sevensa/wpcs-staging-sync:latest
+    container_name: wpcs-staging-sync
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=mysql://wpcs:${WPCS_DB_PASSWORD}@wpcs-db:3306/wpcs
+      - REDIS_URL=redis://wpcs-redis:6379
+      - REDIS_PASSWORD=${WPCS_REDIS_PASSWORD}
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=wpcs
+      - VAULT_ROLE_ID=${WPCS_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${WPCS_VAULT_SECRET_ID}
+    volumes:
+      - wpcs-sites:/var/www/html
+    networks:
+      - wpcs_network
+      - shared_network
+    depends_on:
+      - wpcs-db
+      - wpcs-redis
+
+volumes:
+  wpcs-db-data:
+  wpcs-redis-data:
+  wpcs-sites:
+
+networks:
+  wpcs_network:
+    external: true
+  traefik_network:
+    external: true
+  shared_network:
+    external: true

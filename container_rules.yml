@@ -1,0 +1,82 @@
+groups:
+- name: container_alerts
+  rules:
+  # Alert voor hoge container CPU gebruik
+  - alert: ContainerHighCPUUsage
+    expr: (sum(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name, instance) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage in container {{ $labels.name }} on {{ $labels.instance }}"
+      description: "Container CPU usage is above 80% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor hoge container geheugen gebruik
+  - alert: ContainerHighMemoryUsage
+    expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage in container {{ $labels.name }} on {{ $labels.instance }}"
+      description: "Container memory usage is above 80% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor container restarts
+  - alert: ContainerRestarting
+    expr: changes(container_start_time_seconds{name!=""}[15m]) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Container {{ $labels.name }} on {{ $labels.instance }} is restarting frequently"
+      description: "Container has restarted more than 2 times in the last 15 minutes.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  # Alert voor container down
+  - alert: ContainerDown
+    expr: absent(container_start_time_seconds{name!=""})
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Container {{ $labels.name }} on {{ $labels.instance }} is down"
+      description: "Container has been down for more than 1 minute.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  # Alert voor container volume usage
+  - alert: ContainerVolumeUsage
+    expr: (container_fs_usage_bytes{name!=""} / container_fs_limit_bytes{name!=""} * 100) > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High volume usage in container {{ $labels.name }} on {{ $labels.instance }}"
+      description: "Container volume usage is above 85% for more than 5 minutes.\n  VALUE = {{ $value }}%\n  LABELS = {{ $labels }}"
+
+  # Alert voor container netwerk errors
+  - alert: ContainerNetworkErrors
+    expr: rate(container_network_receive_errors_total{name!=""}[5m]) + rate(container_network_transmit_errors_total{name!=""}[5m]) > 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Network errors in container {{ $labels.name }} on {{ $labels.instance }}"
+      description: "Container network errors detected for more than 5 minutes.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  # Alert voor container zonder memory limit
+  - alert: ContainerNoMemoryLimit
+    expr: container_spec_memory_limit_bytes{name!=""} == 0
+    for: 5m
+    labels:
+      severity: info
+    annotations:
+      summary: "Container {{ $labels.name }} on {{ $labels.instance }} has no memory limit"
+      description: "Container is running without a memory limit.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  # Alert voor container zonder CPU limit
+  - alert: ContainerNoCPULimit
+    expr: container_spec_cpu_shares{name!=""} == 0
+    for: 5m
+    labels:
+      severity: info
+    annotations:
+      summary: "Container {{ $labels.name }} on {{ $labels.instance }} has no CPU limit"
+      description: "Container is running without a CPU limit.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

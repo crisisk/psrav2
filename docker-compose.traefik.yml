@@ -1,0 +1,127 @@
+version: '3.8'
+
+# Dit bestand definieert de Traefik reverse proxy configuratie met OIDC integratie
+# Traefik fungeert als de centrale toegangspoort voor alle services en integreert met Keycloak voor authenticatie
+
+services:
+  # Traefik reverse proxy
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      # Docker provider configuratie
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-net"
+      # File provider voor statische configuratie
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      # Entrypoints configuratie
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # HTTP naar HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt certificaten
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
+      # Metrics en monitoring
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      # API en dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.format=json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/etc/traefik/acme
+      - ./traefik/dynamic:/etc/traefik/dynamic
+      - ./traefik/logs:/var/log/traefik
+    networks:
+      - traefik-net
+      - rentguy-net
+      - psra-net
+      - wpcs-net
+      - ai-net
+      - keycloak-net
+      - monitoring-net
+      - logging-net
+    labels:
+      # Dashboard configuratie
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.sevensa.nl`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      # Beveiliging met ForwardAuth middleware naar Keycloak
+      - "traefik.http.routers.dashboard.middlewares=admin-auth"
+      # Admin authenticatie middleware
+      - "traefik.http.middlewares.admin-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.admin-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.middlewares.admin-auth.forwardauth.trustForwardHeader=true"
+    restart: unless-stopped
+    depends_on:
+      - traefik-forward-auth
+
+  # Traefik Forward Auth voor OIDC integratie met Keycloak
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2.5.0
+    container_name: traefik-forward-auth
+    environment:
+      - PROVIDERS_OIDC_ISSUER_URL=https://auth.sevensa.nl/auth/realms/sevensa
+      - PROVIDERS_OIDC_CLIENT_ID=traefik-forward-auth
+      - PROVIDERS_OIDC_CLIENT_SECRET=${TRAEFIK_FORWARD_AUTH_SECRET}
+      - SECRET=${TRAEFIK_FORWARD_AUTH_COOKIE_SECRET}
+      - AUTH_HOST=auth.traefik.sevensa.nl
+      - URL_PATH=/_oauth
+      - COOKIE_DOMAIN=sevensa.nl
+      - COOKIE_SECURE=true
+      - LIFETIME=3600
+      - DEFAULT_PROVIDER=oidc
+      - DEFAULT_ACTION=auth
+      - LOG_LEVEL=info
+      - INSECURE_COOKIE=false
+      - COOKIE_NAME=_forward_auth
+      - CSRF_COOKIE_NAME=_forward_auth_csrf
+    networks:
+      - traefik-net
+      - keycloak-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-forward-auth.rule=Host(`auth.traefik.sevensa.nl`)"
+      - "traefik.http.routers.traefik-forward-auth.entrypoints=websecure"
+      - "traefik.http.routers.traefik-forward-auth.tls=true"
+      - "traefik.http.routers.traefik-forward-auth.tls.certresolver=letsencrypt"
+      - "traefik.http.services.traefik-forward-auth.loadbalancer.server.port=4181"
+    restart: unless-stopped
+
+networks:
+  traefik-net:
+    external: true
+  rentguy-net:
+    external: true
+  psra-net:
+    external: true
+  wpcs-net:
+    external: true
+  ai-net:
+    external: true
+  keycloak-net:
+    external: true
+  monitoring-net:
+    external: true
+  logging-net:
+    external: true
+
+volumes:
+  traefik-certificates:
+    name: traefik-certificates

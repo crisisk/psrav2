@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-brand: #00A896;
+  --color-ink: #2D3A45;
+  --color-success: #4CAF50;
+  --color-danger: #F44336;
+}
+body { color: var(--color-ink); }
+.btn-primary { @apply px-4 py-2 rounded-xl bg-brand text-white shadow-card hover:opacity-95 focus:ring-2 focus:ring-brand; }

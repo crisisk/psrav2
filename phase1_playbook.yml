@@ -1,0 +1,192 @@
+---
+# Phase 1 Playbook: Extend Existing Secret Management & Identity Infrastructure
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+- name: Phase 1 - Extend Existing Secret Management & Identity Infrastructure
+  hosts: all
+  become: true
+  vars:
+    project_dir: "/opt/central-vault"
+    bao_http_port: "8200"
+    kc_http_port: "8080"
+  tasks:
+    - name: Include OpenBao extension role
+      include_role:
+        name: openbao_extension
+      tags:
+        - openbao
+
+    - name: Include Keycloak extension role
+      include_role:
+        name: keycloak_extension
+      tags:
+        - keycloak
+
+    - name: Verify OpenBao configuration
+      shell: |
+        export VAULT_ADDR="http://127.0.0.1:{{ bao_http_port }}"
+        export VAULT_TOKEN="$(cat {{ project_dir }}/openbao/root.token)"
+        
+        # Check namespaces
+        echo "Checking namespaces..."
+        NAMESPACES=$(docker compose exec -T openbao bao namespace list -format=json | jq -r '.[] | .path')
+        for NS in sevensa rentguy psra wpcs ai; do
+          if echo "$NAMESPACES" | grep -q "$NS"; then
+            echo "Namespace $NS exists"
+          else
+            echo "Namespace $NS does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check policies
+        echo "Checking policies..."
+        POLICIES=$(docker compose exec -T openbao bao policy list -format=json | jq -r '.[]')
+        for POLICY in admin-policy rentguy-policy psra-policy wpcs-policy ai-policy; do
+          if echo "$POLICIES" | grep -q "$POLICY"; then
+            echo "Policy $POLICY exists"
+          else
+            echo "Policy $POLICY does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check auth methods
+        echo "Checking auth methods..."
+        AUTH_METHODS=$(docker compose exec -T openbao bao auth list -format=json | jq -r 'keys[]')
+        for METHOD in oidc/ approle/; do
+          if echo "$AUTH_METHODS" | grep -q "$METHOD"; then
+            echo "Auth method $METHOD exists"
+          else
+            echo "Auth method $METHOD does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check secret engines
+        echo "Checking secret engines..."
+        for NS in rentguy psra wpcs ai; do
+          SECRET_ENGINES=$(docker compose exec -T openbao sh -lc "export VAULT_TOKEN=$VAULT_TOKEN; export VAULT_NAMESPACE=$NS; bao secrets list -format=json" | jq -r 'keys[]')
+          for ENGINE in transit/ database/; do
+            if echo "$SECRET_ENGINES" | grep -q "$ENGINE"; then
+              echo "Secret engine $ENGINE exists in namespace $NS"
+            else
+              if [ "$ENGINE" = "database/" ] && [ "$NS" = "ai" ]; then
+                echo "Database engine not required for AI namespace"
+              else
+                echo "Secret engine $ENGINE does not exist in namespace $NS"
+                exit 1
+              fi
+            fi
+          done
+        done
+        
+        echo "OpenBao configuration verified successfully"
+      args:
+        chdir: "{{ project_dir }}"
+      register: openbao_verification
+      changed_when: false
+      tags:
+        - verify
+        - openbao
+
+    - name: Verify Keycloak configuration
+      shell: |
+        export KEYCLOAK_URL="http://127.0.0.1:{{ kc_http_port }}"
+        export KEYCLOAK_ADMIN="{{ keycloak_admin }}"
+        export KEYCLOAK_ADMIN_PASSWORD="{{ keycloak_admin_password }}"
+        
+        # Get admin token
+        TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "username=${KEYCLOAK_ADMIN}" \
+          -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+          -d "grant_type=password" \
+          -d "client_id=admin-cli" | jq -r .access_token)
+        
+        # Check realm
+        echo "Checking realm..."
+        REALM=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/sevensa" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" | jq -r '.realm')
+        if [ "$REALM" = "sevensa" ]; then
+          echo "Realm sevensa exists"
+        else
+          echo "Realm sevensa does not exist"
+          exit 1
+        fi
+        
+        # Check clients
+        echo "Checking clients..."
+        CLIENTS=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/sevensa/clients" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" | jq -r '.[].clientId')
+        for CLIENT in bao-oidc rentguy-client psra-client wpcs-client ai-client oauth2-proxy; do
+          if echo "$CLIENTS" | grep -q "$CLIENT"; then
+            echo "Client $CLIENT exists"
+          else
+            echo "Client $CLIENT does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check roles
+        echo "Checking roles..."
+        ROLES=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/sevensa/roles" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" | jq -r '.[].name')
+        for ROLE in admin rentguy-admin rentguy-user psra-admin psra-user wpcs-admin wpcs-user ai-admin ai-user; do
+          if echo "$ROLES" | grep -q "$ROLE"; then
+            echo "Role $ROLE exists"
+          else
+            echo "Role $ROLE does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check groups
+        echo "Checking groups..."
+        GROUPS=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/sevensa/groups" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" | jq -r '.[].name')
+        for GROUP in "Administrators" "RentGuy Users" "RentGuy Administrators" "PSRA Users" "PSRA Administrators" "WPCS Users" "WPCS Administrators" "AI Users" "AI Administrators"; do
+          if echo "$GROUPS" | grep -q "$GROUP"; then
+            echo "Group $GROUP exists"
+          else
+            echo "Group $GROUP does not exist"
+            exit 1
+          fi
+        done
+        
+        # Check MFA flow
+        echo "Checking MFA flow..."
+        MFA_FLOW=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/sevensa/authentication/flows" \
+          -H "Authorization: Bearer ${TOKEN}" \
+          -H "Content-Type: application/json" | jq -r '.[] | select(.alias == "browser-mfa") | .alias')
+        if [ "$MFA_FLOW" = "browser-mfa" ]; then
+          echo "MFA flow exists"
+        else
+          echo "MFA flow does not exist"
+          exit 1
+        fi
+        
+        echo "Keycloak configuration verified successfully"
+      args:
+        chdir: "{{ project_dir }}"
+      register: keycloak_verification
+      changed_when: false
+      vars:
+        keycloak_admin: "{{ lookup('env', 'KEYCLOAK_ADMIN') | default('admin', true) }}"
+        keycloak_admin_password: "{{ lookup('env', 'KEYCLOAK_ADMIN_PASSWORD') | default('changeme-keycloak-admin', true) }}"
+      tags:
+        - verify
+        - keycloak
+
+    - name: Display verification results
+      debug:
+        msg: |
+          OpenBao verification: {{ 'Success' if openbao_verification.rc == 0 else 'Failed' }}
+          Keycloak verification: {{ 'Success' if keycloak_verification.rc == 0 else 'Failed' }}
+      tags:
+        - verify

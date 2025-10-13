@@ -1,0 +1,56 @@
+---
+# Phase 2 Playbook: Implement Zero-Trust Network Access (ZTNA)
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+- name: Phase 2 - Implement Zero-Trust Network Access (ZTNA)
+  hosts: all
+  become: true
+  vars:
+    project_dir: "/opt/central-vault"
+  tasks:
+    - name: Include network segmentation role
+      include_role:
+        name: network_segmentation
+      tags:
+        - network
+
+    - name: Stop all services
+      shell: |
+        cd {{ project_dir }} && docker-compose down
+      args:
+        chdir: "{{ project_dir }}"
+      tags:
+        - stop
+
+    - name: Start services with network segmentation
+      shell: |
+        cd {{ project_dir }} && \
+        docker-compose -f networks/docker-compose.networks.yml up -d && \
+        docker-compose -f networks/docker-compose.openbao.yml up -d && \
+        docker-compose -f networks/docker-compose.keycloak.yml up -d && \
+        docker-compose -f networks/docker-compose.rentguy.yml up -d && \
+        docker-compose -f networks/docker-compose.psra.yml up -d && \
+        docker-compose -f networks/docker-compose.wpcs.yml up -d && \
+        docker-compose -f networks/docker-compose.ai.yml up -d
+      args:
+        chdir: "{{ project_dir }}"
+      tags:
+        - start
+
+    - name: Verify service connectivity
+      shell: |
+        cd {{ project_dir }} && ./scripts/test_networks.sh
+      args:
+        chdir: "{{ project_dir }}"
+      register: network_verification
+      changed_when: false
+      tags:
+        - verify
+
+    - name: Display verification results
+      debug:
+        msg: |
+          Network verification: {{ 'Success' if network_verification.rc == 0 else 'Failed' }}
+      tags:
+        - verify

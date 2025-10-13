@@ -1,0 +1,150 @@
+global:
+  scrape_interval: 15s     # Hoe vaak metrics worden verzameld
+  evaluation_interval: 15s # Hoe vaak alerting rules worden geëvalueerd
+  scrape_timeout: 10s      # Timeout voor scrape requests
+
+# Alertmanager configuratie
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Regel bestanden die worden geladen
+rule_files:
+  - /etc/prometheus/rules/node_rules.yml
+  - /etc/prometheus/rules/container_rules.yml
+  - /etc/prometheus/rules/service_rules.yml
+
+# Configuratie voor metrics verzameling
+scrape_configs:
+  # Prometheus zelf
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus'
+          service: 'monitoring'
+
+  # Node Exporter voor host metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          instance: 'vps-147-93-57-40'
+          service: 'host'
+
+  # cAdvisor voor container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          instance: 'vps-147-93-57-40'
+          service: 'containers'
+
+  # Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8082']
+        labels:
+          instance: 'traefik'
+          service: 'proxy'
+
+  # RentGuy API metrics
+  - job_name: 'rentguy-api'
+    static_configs:
+      - targets: ['rentguy-api:3000']
+        labels:
+          instance: 'rentguy-api'
+          service: 'rentguy'
+
+  # RentGuy Auth Service metrics
+  - job_name: 'rentguy-auth'
+    static_configs:
+      - targets: ['rentguy-auth-service:4000']
+        labels:
+          instance: 'rentguy-auth'
+          service: 'rentguy'
+
+  # PSRA API metrics
+  - job_name: 'psra-api'
+    static_configs:
+      - targets: ['psra-api:3000']
+        labels:
+          instance: 'psra-api'
+          service: 'psra'
+
+  # WPCS API metrics
+  - job_name: 'wpcs-api'
+    static_configs:
+      - targets: ['wpcs-api:3000']
+        labels:
+          instance: 'wpcs-api'
+          service: 'wpcs'
+
+  # AI Orchestrator metrics
+  - job_name: 'ai-orchestrator'
+    static_configs:
+      - targets: ['ai-orchestrator:3000']
+        labels:
+          instance: 'ai-orchestrator'
+          service: 'ai'
+
+  # Claude Chat metrics
+  - job_name: 'claude-chat'
+    static_configs:
+      - targets: ['claude-chat:3000']
+        labels:
+          instance: 'claude-chat'
+          service: 'ai'
+
+  # N8N metrics
+  - job_name: 'n8n'
+    static_configs:
+      - targets: ['n8n:5678']
+        labels:
+          instance: 'n8n'
+          service: 'ai'
+
+  # LangGraph metrics
+  - job_name: 'langgraph'
+    static_configs:
+      - targets: ['langgraph:3000']
+        labels:
+          instance: 'langgraph'
+          service: 'ai'
+
+  # Keycloak metrics
+  - job_name: 'keycloak'
+    static_configs:
+      - targets: ['keycloak:8080']
+        labels:
+          instance: 'keycloak'
+          service: 'auth'
+
+  # Vault metrics
+  - job_name: 'vault'
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ['vault:8200']
+        labels:
+          instance: 'vault'
+          service: 'secrets'
+
+  # Database metrics (PostgreSQL)
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          instance: 'postgres'
+          service: 'database'
+
+  # Redis metrics
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          instance: 'redis'
+          service: 'cache'

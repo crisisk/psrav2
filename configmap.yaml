@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rentguy-config
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+data:
+  api_url: "https://rentguy.sevensa.nl/api"
+  keycloak_url: "https://keycloak.sevensa.nl"
+  keycloak_realm: "sevensa"
+  keycloak_client_id: "rentguy-client"
+  openbao_url: "https://openbao.sevensa.nl"
+  log_level: "info"
+  environment: "production"
+  app_config.json: |
+    {
+      "app": {
+        "name": "RentGuy",
+        "version": "1.0.0",
+        "description": "Property Management Platform"
+      },
+      "features": {
+        "onboarding": true,
+        "payments": true,
+        "maintenance": true,
+        "reporting": true,
+        "notifications": true
+      },
+      "api": {
+        "timeout": 30000,
+        "retries": 3
+      },
+      "ui": {
+        "theme": "light",
+        "language": "en",
+        "dateFormat": "DD/MM/YYYY",
+        "timeFormat": "HH:mm"
+      }
+    }

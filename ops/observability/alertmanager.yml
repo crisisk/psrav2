@@ -1,0 +1,81 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'SLACK_WEBHOOK_URL_PLACEHOLDER'  # Replace with actual webhook URL
+  # HTTP client timeout
+  http_config:
+    timeout: 10s
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'slack-notifications'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      continue: true
+      repeat_interval: 4h
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      repeat_interval: 12h
+
+receivers:
+  - name: 'slack-notifications'
+    slack_configs:
+      - channel: '#psra-alerts'
+        title: 'PSRA Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          *Details:* {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#psra-critical'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Summary:* {{ .Annotations.summary }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Started:* {{ .StartsAt }}
+          {{ end }}
+        send_resolved: true
+        color: 'danger'
+        username: 'PSRA Alertmanager'
+        icon_emoji: ':fire:'
+
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#psra-warnings'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Summary:* {{ .Annotations.summary }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+        username: 'PSRA Alertmanager'
+        icon_emoji: ':warning:'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']

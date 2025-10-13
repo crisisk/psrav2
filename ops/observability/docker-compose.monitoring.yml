@@ -1,0 +1,259 @@
+version: '3.8'
+
+# PSRA-LTSD Enterprise Monitoring Stack
+# Includes: Prometheus, Alertmanager, Grafana, and exporters
+
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+  # Connect to application network if exists
+  psra-network:
+    external: true
+    name: psra-network
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+
+services:
+  # Prometheus - Time-series database and metrics collector
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: psra-prometheus
+    restart: unless-stopped
+    user: "0:0"  # Run as root to avoid permission issues
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
+      - prometheus_data:/prometheus
+      # Mount docker socket for service discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+      - psra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9090"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - alertmanager
+
+  # Alertmanager - Alert routing and notification
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: psra-alertmanager
+    restart: unless-stopped
+    user: "0:0"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.advertise-address=0.0.0.0:9093'
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9093"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Grafana - Metrics visualization and dashboards
+  grafana:
+    image: grafana/grafana:10.1.5
+    container_name: psra-grafana
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=psra-grafana-2024
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+      - psra-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Exporter - Database metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.14.0
+    container_name: psra-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://psra_user:psra_password@postgres:5432/psra_ltsd?sslmode=disable
+    ports:
+      - "9187:9187"
+    networks:
+      - monitoring
+      - psra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9187"
+    depends_on:
+      - prometheus
+
+  # Redis Exporter - Cache metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: psra-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=
+    ports:
+      - "9121:9121"
+    networks:
+      - monitoring
+      - psra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9121"
+    depends_on:
+      - prometheus
+
+  # Node Exporter - Host system metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: psra-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9100"
+    depends_on:
+      - prometheus
+
+  # cAdvisor - Container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: psra-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=8080"
+    depends_on:
+      - prometheus
+    devices:
+      - /dev/kmsg
+
+  # Blackbox Exporter - HTTP/HTTPS endpoint probing
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: psra-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/blackbox/blackbox.yml'
+    volumes:
+      - ./blackbox-config.yml:/etc/blackbox/blackbox.yml:ro
+    ports:
+      - "9115:9115"
+    networks:
+      - monitoring
+      - psra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9115"
+    depends_on:
+      - prometheus
+
+  # Pushgateway - For batch job metrics
+  pushgateway:
+    image: prom/pushgateway:v1.6.2
+    container_name: psra-pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    networks:
+      - monitoring
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9091"
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9091/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Health check for entire stack
+# Access URLs:
+# - Prometheus: http://localhost:9090
+# - Alertmanager: http://localhost:9093
+# - Grafana: http://localhost:3000 (admin/psra-grafana-2024)
+# - Node Exporter: http://localhost:9100/metrics
+# - cAdvisor: http://localhost:8080
+# - Blackbox Exporter: http://localhost:9115
+# - Pushgateway: http://localhost:9091

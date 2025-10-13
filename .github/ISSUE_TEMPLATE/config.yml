@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/your-org/psra-ltsd-enterprise-v2/wiki
+    about: Check our documentation for answers to common questions
+  - name: Security Contact
+    url: mailto:security@example.com
+    about: For critical security vulnerabilities, please email us directly
+  - name: Community Support
+    url: https://github.com/your-org/psra-ltsd-enterprise-v2/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: Stack Overflow
+    url: https://stackoverflow.com/questions/tagged/psra-ltsd
+    about: Search or ask technical questions on Stack Overflow

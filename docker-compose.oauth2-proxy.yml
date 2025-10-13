@@ -1,0 +1,70 @@
+version: '3.8'
+
+# Docker Compose file for OAuth2 Proxy
+# This file defines the OAuth2 Proxy service for authentication
+
+services:
+  # OAuth2 Proxy service
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.4.0
+    container_name: oauth2-proxy
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - oauth2-proxy
+      - keycloak-client
+    volumes:
+      - ${OAUTH2_PROXY_CONFIG_PATH:-/opt/sevensa/oauth2-proxy}/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
+      - ${OAUTH2_PROXY_TEMPLATES_PATH:-/opt/sevensa/oauth2-proxy/templates}:/etc/oauth2-proxy/templates:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - TZ=Europe/Amsterdam
+      - OAUTH2_PROXY_CONFIG=/etc/oauth2-proxy/oauth2-proxy.cfg
+    secrets:
+      - oauth2_proxy_client_secret
+      - oauth2_proxy_cookie_secret
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4180/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.oauth2-proxy.rule=Host(`auth.sevensa.nl`)"
+      - "traefik.http.routers.oauth2-proxy.entrypoints=websecure"
+      - "traefik.http.routers.oauth2-proxy.tls=true"
+      - "traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180"
+      - "traefik.http.middlewares.oauth2-proxy-security.headers.customResponseHeaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.oauth2-proxy-security.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.oauth2-proxy-security.headers.customResponseHeaders.X-XSS-Protection=1; mode=block"
+      - "traefik.http.middlewares.oauth2-proxy-security.headers.customResponseHeaders.Referrer-Policy=strict-origin-when-cross-origin"
+      - "traefik.http.routers.oauth2-proxy.middlewares=oauth2-proxy-security"
+
+networks:
+  traefik-public:
+    external: true
+  oauth2-proxy:
+    external: true
+  keycloak-client:
+    external: true
+
+secrets:
+  oauth2_proxy_client_secret:
+    file: ${OAUTH2_PROXY_SECRETS_PATH:-/opt/sevensa/oauth2-proxy/secrets}/client_secret.txt
+  oauth2_proxy_cookie_secret:
+    file: ${OAUTH2_PROXY_SECRETS_PATH:-/opt/sevensa/oauth2-proxy/secrets}/cookie_secret.txt

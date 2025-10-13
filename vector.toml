@@ -1,0 +1,189 @@
+# Vector Configuration
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+# Data Sources
+[sources.docker_logs]
+type = "docker_logs"
+include_containers = ["*"]
+exclude_containers = []
+
+[sources.file_logs]
+type = "file"
+include = ["/var/log/**/*.log"]
+ignore_older = 86400  # 1 day
+
+# Transforms
+[transforms.parse_docker_logs]
+type = "remap"
+inputs = ["docker_logs"]
+source = '''
+  .parsed = parse_json!(.message)
+  .timestamp = to_timestamp!(.parsed.time)
+  .message = .parsed.log
+  .container_name = .container_name
+  .container_id = .container_id
+  .image = .image
+'''
+
+[transforms.parse_json_logs]
+type = "remap"
+inputs = ["parse_docker_logs"]
+source = '''
+  if is_json(.message) {
+    .parsed = parse_json!(.message)
+    if exists(.parsed.level) {
+      .level = .parsed.level
+    }
+    if exists(.parsed.message) {
+      .message = .parsed.message
+    }
+    if exists(.parsed.request_id) {
+      .request_id = .parsed.request_id
+    }
+    if exists(.parsed.trace_id) {
+      .trace_id = .parsed.trace_id
+    }
+    if exists(.parsed.session_id) {
+      .session_id = .parsed.session_id
+    }
+    if exists(.parsed.user_id) {
+      .user_id = .parsed.user_id
+    }
+    if exists(.parsed.method) {
+      .method = .parsed.method
+    }
+    if exists(.parsed.path) {
+      .path = .parsed.path
+    }
+    if exists(.parsed.status_code) {
+      .status_code = .parsed.status_code
+    }
+    if exists(.parsed.response_time_ms) {
+      .response_time_ms = .parsed.response_time_ms
+    }
+  }
+'''
+
+[transforms.detect_errors]
+type = "remap"
+inputs = ["parse_json_logs"]
+source = '''
+  if exists(.level) {
+    if .level == "error" || .level == "ERROR" || .level == "FATAL" || .level == "fatal" {
+      .is_error = true
+    } else {
+      .is_error = false
+    }
+  } else {
+    .is_error = false
+  }
+'''
+
+[transforms.detect_service]
+type = "remap"
+inputs = ["detect_errors"]
+source = '''
+  if contains(.container_name, "rentguy") {
+    .service = "rentguy"
+  } else if contains(.container_name, "psra") {
+    .service = "psra"
+  } else if contains(.container_name, "wpcs") {
+    .service = "wpcs"
+  } else if contains(.container_name, "langgraph") || contains(.container_name, "n8n") || contains(.container_name, "claude") || contains(.container_name, "trading") {
+    .service = "ai"
+  } else if contains(.container_name, "traefik") {
+    .service = "traefik"
+  } else if contains(.container_name, "openbao") {
+    .service = "openbao"
+  } else if contains(.container_name, "keycloak") {
+    .service = "keycloak"
+  } else if contains(.container_name, "prometheus") || contains(.container_name, "grafana") || contains(.container_name, "alertmanager") || contains(.container_name, "loki") {
+    .service = "monitoring"
+  } else {
+    .service = "other"
+  }
+'''
+
+[transforms.redact_pii]
+type = "remap"
+inputs = ["detect_service"]
+source = '''
+  if exists(.message) {
+    # Redact credit card numbers
+    .message = replace(.message, /[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}/, "[REDACTED_CC]")
+    
+    # Redact email addresses
+    .message = replace(.message, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, "[REDACTED_EMAIL]")
+    
+    # Redact IP addresses
+    .message = replace(.message, /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/, "[REDACTED_IP]")
+    
+    # Redact social security numbers
+    .message = replace(.message, /\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b/, "[REDACTED_SSN]")
+    
+    # Redact phone numbers
+    .message = replace(.message, /\b(\+[0-9]{1,3}[- ]?)?(\([0-9]{1,4}\)[- ]?)?[0-9]{1,4}[- ]?[0-9]{1,4}[- ]?[0-9]{1,9}\b/, "[REDACTED_PHONE]")
+  }
+'''
+
+[transforms.enrich_logs]
+type = "remap"
+inputs = ["redact_pii"]
+source = '''
+  # Add hostname
+  .hostname = get_env_var!("HOSTNAME")
+  
+  # Add timestamp if not exists
+  if !exists(.timestamp) {
+    .timestamp = now()
+  }
+  
+  # Add log_type
+  if exists(.is_error) && .is_error {
+    .log_type = "error"
+  } else if exists(.level) {
+    if .level == "warn" || .level == "WARNING" || .level == "warning" {
+      .log_type = "warning"
+    } else if .level == "info" || .level == "INFO" {
+      .log_type = "info"
+    } else if .level == "debug" || .level == "DEBUG" {
+      .log_type = "debug"
+    } else {
+      .log_type = "unknown"
+    }
+  } else {
+    .log_type = "unknown"
+  }
+'''
+
+# Sinks
+[sinks.loki]
+type = "loki"
+inputs = ["enrich_logs"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+labels.job = "{{ service }}"
+labels.host = "{{ hostname }}"
+labels.level = "{{ level }}"
+labels.container_name = "{{ container_name }}"
+labels.is_error = "{{ is_error }}"
+labels.log_type = "{{ log_type }}"
+
+[sinks.error_logs]
+type = "loki"
+inputs = ["enrich_logs"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+labels.job = "errors"
+labels.host = "{{ hostname }}"
+labels.level = "{{ level }}"
+labels.container_name = "{{ container_name }}"
+labels.service = "{{ service }}"
+condition = '.is_error == true'
+
+[sinks.console]
+type = "console"
+inputs = ["enrich_logs"]
+encoding.codec = "json"
+target = "stdout"

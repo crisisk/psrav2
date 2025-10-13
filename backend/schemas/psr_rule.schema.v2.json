@@ -1,0 +1,1155 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.psra.dev/backend/psr_rule.schema.v2.json",
+  "title": "PSRA Rules-as-Code Specification v2",
+  "description": "Comprehensive JSON Schema for PSRA (Preferential Status Rules Assessment) origin rules supporting trade agreements including CETA, TCA, EPA, and EU-JP. This schema enforces strict validation for Rules-as-Code (RaC) including rule metadata, HS classification, material composition, value content thresholds, and Regional Value Content (RVC) calculations.",
+  "$comment": "This schema is aligned with Pydantic models in backend/app/contracts/psra.py and validates YAML rule files in psr/rules/",
+  "type": "object",
+  "required": [
+    "version",
+    "metadata",
+    "criteria",
+    "decision",
+    "audit"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^2\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the rule schema (must start with 2.x.x)",
+      "$comment": "Version format follows semver conventions. Major version 2 indicates the current RaC specification."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Core metadata identifying and categorizing the origin rule",
+      "$comment": "Metadata provides essential identification and lifecycle management for rules",
+      "required": [
+        "rule_id",
+        "title",
+        "description",
+        "agreement",
+        "hs_code",
+        "jurisdiction",
+        "effective_from",
+        "priority",
+        "supersedes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,5}-HS[0-9]{2}-[0-9]{3}$",
+          "description": "Unique rule identifier in format: AGREEMENT-HSCHAPTER-SEQUENCE (e.g., CETA-HS39-001)",
+          "$comment": "Format: {AGREEMENT_CODE}-HS{CHAPTER}-{SEQUENCE}. Agreement code 2-5 uppercase letters, chapter 2 digits, sequence 3 digits.",
+          "examples": [
+            "CETA-HS39-001",
+            "TCA-HS40-002",
+            "EUJP-HS84-015"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 255,
+          "description": "Human-readable title describing the rule's purpose",
+          "$comment": "Should concisely describe the product category and key requirement (e.g., 'Polymerization requirement for HS 39.01')",
+          "examples": [
+            "Polymerization requirement for HS 39.01",
+            "Vulcanized rubber components rule",
+            "Textile finishing operations for HS 52"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 4096,
+          "description": "Detailed description of the rule, its requirements, and qualifying conditions",
+          "$comment": "Should explain: (1) product classification, (2) key qualifying criteria, (3) RVC thresholds, (4) process requirements"
+        },
+        "agreement": {
+          "type": "object",
+          "description": "Trade agreement under which this rule applies",
+          "$comment": "Must reference a valid trade agreement with active status. Supported agreements: CETA, TCA, EU-JP-EPA, USMCA, RCEP",
+          "required": [
+            "code",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^[A-Z0-9-]{2,10}$",
+              "description": "Standard agreement code identifier",
+              "$comment": "Must be uppercase alphanumeric with optional hyphens, 2-10 characters. Common codes: CETA, TCA, EU-UK-TCA, EU-JP-EPA, USMCA, RCEP",
+              "enum": [
+                "CETA",
+                "TCA",
+                "EU-UK-TCA",
+                "EU-JP-EPA",
+                "EUJP",
+                "USMCA",
+                "RCEP",
+                "EFTA",
+                "MERCOSUR",
+                "ASEAN"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 255,
+              "description": "Full legal name of the trade agreement",
+              "examples": [
+                "Comprehensive Economic and Trade Agreement",
+                "EU-UK Trade and Cooperation Agreement",
+                "EU-Japan Economic Partnership Agreement"
+              ]
+            }
+          }
+        },
+        "hs_code": {
+          "type": "object",
+          "description": "Harmonized System (HS) classification code identifying the product category",
+          "$comment": "HS codes must be hierarchically consistent: subheading must start with heading, heading must start with chapter",
+          "required": [
+            "chapter",
+            "heading",
+            "subheading"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "chapter": {
+              "type": "string",
+              "pattern": "^[0-9]{2}$",
+              "description": "2-digit HS chapter code (e.g., '39' for plastics)",
+              "$comment": "HS chapters range from 01 to 99. Leading zeros required.",
+              "examples": [
+                "39",
+                "40",
+                "84",
+                "85"
+              ]
+            },
+            "heading": {
+              "type": "string",
+              "pattern": "^[0-9]{4}$",
+              "description": "4-digit HS heading code (must start with the chapter digits)",
+              "$comment": "First 2 digits must match the chapter. Example: chapter '39' requires heading to start with '39' (e.g., '3901')",
+              "examples": [
+                "3901",
+                "4011",
+                "8471"
+              ]
+            },
+            "subheading": {
+              "type": "string",
+              "pattern": "^[0-9]{6}$",
+              "description": "6-digit HS subheading code (must start with the heading digits)",
+              "$comment": "First 4 digits must match the heading. Example: heading '3901' requires subheading to start with '3901' (e.g., '390110')",
+              "examples": [
+                "390110",
+                "401110",
+                "847130"
+              ]
+            }
+          }
+        },
+        "jurisdiction": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "description": "List of ISO 3166-1 alpha-2 country/region codes where this rule applies",
+          "$comment": "Must contain at least one jurisdiction. Use ISO codes (EU, CA, UK, JP, US, etc.). All entries must be unique.",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country or region code",
+            "examples": [
+              "EU",
+              "CA",
+              "UK",
+              "JP",
+              "US",
+              "MX"
+            ]
+          },
+          "examples": [
+            [
+              "EU",
+              "CA"
+            ],
+            [
+              "EU",
+              "UK"
+            ],
+            [
+              "EU",
+              "JP"
+            ]
+          ]
+        },
+        "effective_from": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when this rule becomes effective (ISO 8601 format: YYYY-MM-DD)",
+          "$comment": "Rules are only evaluated for transactions on or after this date. Must be a valid ISO 8601 date.",
+          "examples": [
+            "2024-01-01",
+            "2024-06-01"
+          ]
+        },
+        "effective_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date",
+          "description": "Optional expiry date for this rule (ISO 8601 format: YYYY-MM-DD). Null indicates indefinite validity.",
+          "$comment": "If set, this rule is only valid for transactions before this date. Use null for rules with no expiry.",
+          "examples": [
+            "2025-12-31",
+            null
+          ]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999,
+          "description": "Priority level for rule selection when multiple rules match (0 = highest priority)",
+          "$comment": "Lower numbers indicate higher priority. When multiple rules match the same HS code and agreement, the rule with lowest priority value is evaluated first. Range: 0-999."
+        },
+        "supersedes": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "List of rule IDs that this rule replaces",
+          "$comment": "When this rule becomes effective, all superseded rules should be marked as inactive. Use empty array if this rule doesn't replace any previous rules.",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2,5}-HS[0-9]{2}-[0-9]{3}$",
+            "description": "Rule ID in format: AGREEMENT-HSCHAPTER-SEQUENCE"
+          },
+          "examples": [
+            [],
+            [
+              "TCA-HS40-001"
+            ],
+            [
+              "CETA-HS39-001",
+              "CETA-HS39-002"
+            ]
+          ]
+        }
+      }
+    },
+    "criteria": {
+      "type": "object",
+      "description": "Comprehensive criteria defining requirements for preferential origin qualification",
+      "$comment": "Three pillars of origin determination: Bill of Materials (BOM), Process requirements, and Documentation requirements",
+      "required": [
+        "bom",
+        "process",
+        "documentation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bom": {
+          "type": "object",
+          "description": "Bill of Materials criteria including input requirements and value content thresholds",
+          "$comment": "Defines material composition requirements, Regional Value Content (RVC) calculations, and non-originating material limits",
+          "required": [
+            "required_inputs",
+            "regional_value_content"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required_inputs": {
+              "type": "array",
+              "description": "List of materials, components, or services that must be present in the BOM",
+              "$comment": "Can be empty array if no specific inputs are required. Each input specifies type, HS code, description, and optional maximum percentage.",
+              "items": {
+                "$ref": "#/definitions/required_input"
+              },
+              "examples": [
+                [
+                  {
+                    "type": "material",
+                    "hs_code": "2710",
+                    "description": "Originating naphtha feedstock",
+                    "max_percentage": 50.0
+                  }
+                ]
+              ]
+            },
+            "regional_value_content": {
+              "$ref": "#/definitions/regional_value_content",
+              "description": "Regional Value Content (RVC) calculation method and threshold requirements",
+              "$comment": "Defines how to calculate the percentage of value added in the originating territory. Critical for determining origin qualification."
+            },
+            "non_originating_materials": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Optional constraints on non-originating materials as percentage of total value",
+              "$comment": "If specified, non-originating materials must not exceed the specified percentage. Common in TCA and some EPA rules.",
+              "additionalProperties": false,
+              "required": [
+                "max_percentage"
+              ],
+              "properties": {
+                "max_percentage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Maximum allowed percentage of non-originating materials by value",
+                  "$comment": "Common thresholds: 40% (TCA), 50% (CETA). Must be 0-100.",
+                  "examples": [
+                    40.0,
+                    50.0
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "process": {
+          "type": "object",
+          "description": "Manufacturing process requirements including required and disallowed operations",
+          "$comment": "Specifies which production operations must occur in the originating territory and which operations are insufficient for origin conferral",
+          "required": [
+            "required_operations",
+            "disallowed_operations"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required_operations": {
+              "type": "array",
+              "minItems": 1,
+              "description": "List of operations that must be performed in the originating territory",
+              "$comment": "Must contain at least one operation. These are substantive operations that confer origin. Empty array not allowed - use a generic operation code if necessary.",
+              "items": {
+                "$ref": "#/definitions/operation"
+              },
+              "examples": [
+                [
+                  {
+                    "code": "POLYMERIZATION",
+                    "description": "Polymerization of monomers into polymers"
+                  },
+                  {
+                    "code": "EXTRUSION",
+                    "description": "Extrusion or pelletizing in originating territory"
+                  }
+                ]
+              ]
+            },
+            "disallowed_operations": {
+              "type": "array",
+              "description": "List of operations that do NOT confer origin (insufficient processing)",
+              "$comment": "Operations listed here are considered minimal or insufficient processing. Can be empty array if all operations are allowed. Common examples: packaging, labeling, simple assembly.",
+              "items": {
+                "$ref": "#/definitions/operation"
+              },
+              "examples": [
+                [],
+                [
+                  {
+                    "code": "PACKAGING",
+                    "description": "Simple packaging operations"
+                  },
+                  {
+                    "code": "LABELING",
+                    "description": "Affixing labels or marks"
+                  }
+                ]
+              ]
+            }
+          }
+        },
+        "documentation": {
+          "type": "object",
+          "description": "Documentation and certification requirements for origin claims",
+          "$comment": "Defines required certificates, record retention periods, and additional evidence needed to substantiate origin claims",
+          "required": [
+            "certificates",
+            "record_retention_days"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "certificates": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "List of required origin certificates or declarations",
+              "$comment": "Must contain at least one certificate type. Common certificates: EUR.1, EUR-MED, UK-EUR1, Form A, Certificate of Origin (COO)",
+              "items": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 64,
+                "description": "Certificate code or name",
+                "examples": [
+                  "EUR.1",
+                  "EUR-MED",
+                  "UK-EUR1",
+                  "Form A",
+                  "Certificate of Origin"
+                ]
+              },
+              "examples": [
+                [
+                  "EUR.1"
+                ],
+                [
+                  "UK-EUR1"
+                ],
+                [
+                  "Certificate of Origin",
+                  "EUR.1"
+                ]
+              ]
+            },
+            "record_retention_days": {
+              "type": "integer",
+              "minimum": 365,
+              "maximum": 7300,
+              "description": "Number of days that supporting documentation must be retained",
+              "$comment": "Minimum 1 year (365 days), maximum 20 years (7300 days). Common periods: 3 years (1095 days), 5 years (1825 days), 10 years (3650 days)",
+              "examples": [
+                1095,
+                1825,
+                2190,
+                3650
+              ]
+            },
+            "additional_evidence": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Optional list of additional supporting evidence or documents required",
+              "$comment": "Use for special documentation beyond standard certificates (e.g., audit reports, process records, lab test results)",
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "description"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+$",
+                    "description": "Evidence type identifier (lowercase, alphanumeric with hyphens)",
+                    "$comment": "Use kebab-case naming convention. Examples: audit-report, process-records, lab-certificate, supplier-declaration",
+                    "examples": [
+                      "audit-report",
+                      "process-records",
+                      "lab-certificate",
+                      "supplier-declaration",
+                      "transaction-log"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 512,
+                    "description": "Detailed description of the required evidence"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "description": "Decision logic defining qualification and disqualification verdicts",
+      "$comment": "Provides structured outcomes for both qualified and disqualified scenarios with supporting citations and reasons",
+      "required": [
+        "verdicts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "verdicts": {
+          "type": "object",
+          "description": "Structured verdicts for qualification and disqualification outcomes",
+          "$comment": "Both qualified and disqualified verdicts must be defined. This enables the system to provide complete feedback regardless of outcome.",
+          "required": [
+            "qualified",
+            "disqualified"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "qualified": {
+              "type": "object",
+              "description": "Verdict issued when all criteria are satisfied",
+              "$comment": "Must include description of why the product qualifies and legal citations supporting the decision",
+              "required": [
+                "description",
+                "citations"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 2048,
+                  "description": "Explanation of qualification decision",
+                  "$comment": "Should reference key criteria met (RVC threshold, process requirements, etc.)"
+                },
+                "citations": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Legal citations and references supporting the qualification decision",
+                  "$comment": "Must contain at least one citation to the relevant trade agreement provisions, annexes, or product-specific rules",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "reference"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 512,
+                        "description": "Citation reference to agreement text, annex, or legal provision",
+                        "examples": [
+                          "CETA Annex 5-A",
+                          "TCA Annex ORIG-2",
+                          "EU-JP EPA Annex 3-B"
+                        ]
+                      },
+                      "section": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Optional specific section, article, or rule reference within the citation",
+                        "examples": [
+                          "HS 39",
+                          "Article 2.5",
+                          "PSR for Chapter 84"
+                        ]
+                      },
+                      "url": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "uri",
+                        "pattern": "^https?://",
+                        "maxLength": 1024,
+                        "description": "Optional URL to the referenced legal text or provision"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "disqualified": {
+              "type": "object",
+              "description": "Verdict issued when one or more criteria are not satisfied",
+              "$comment": "Must enumerate all possible disqualification reasons with severity levels",
+              "required": [
+                "reasons"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reasons": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "List of potential disqualification reasons with severity indicators",
+                  "$comment": "Must contain at least one reason. Define all possible failure scenarios. Duplicate reason codes not allowed.",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "description",
+                      "severity"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9_]{3,32}$",
+                        "description": "Machine-readable disqualification reason code",
+                        "$comment": "Use UPPER_SNAKE_CASE naming. Examples: INSUFFICIENT_RVC, MISSING_PROCESS, EXCESS_NON_ORIGINATING, INVALID_CERTIFICATE",
+                        "examples": [
+                          "INSUFFICIENT_RVC",
+                          "MISSING_PROCESS",
+                          "EXCESS_NON_ORIGINATING",
+                          "INVALID_CERTIFICATE",
+                          "DISALLOWED_OPERATION_PERFORMED"
+                        ]
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 2048,
+                        "description": "Human-readable explanation of the disqualification reason"
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "critical"
+                        ],
+                        "description": "Severity level indicating the impact of this disqualification",
+                        "$comment": "low: minor issue, may have remediation options; medium: significant issue affecting origin; high: major criterion failure; critical: fundamental rule violation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "description": "Audit trail and governance information for the rule",
+      "$comment": "Ensures traceability, accountability, and version control for regulatory compliance",
+      "required": [
+        "traceability",
+        "last_reviewed",
+        "reviewer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "traceability": {
+          "type": "object",
+          "description": "Traceability requirements and ledger references for rule lineage",
+          "$comment": "Enables audit trail from rule version to evaluation outcomes. Critical for compliance verification.",
+          "required": [
+            "lineage_required",
+            "ledger_reference"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "lineage_required": {
+              "type": "boolean",
+              "description": "Whether full lineage tracking is required for evaluations using this rule",
+              "$comment": "Set to true for high-risk or frequently audited product categories. False for low-risk commodities."
+            },
+            "ledger_reference": {
+              "type": "string",
+              "pattern": "^ledger://[-/a-z0-9]+$",
+              "description": "URI reference to the immutable ledger entry for this rule version",
+              "$comment": "Uses custom ledger:// URI scheme. Format: ledger://{ledger-name}/{path}. Enables cryptographic verification of rule integrity.",
+              "examples": [
+                "ledger://psra/version-ledger/v1",
+                "ledger://psra/rules/ceta/hs39/001",
+                "ledger://compliance/origin-rules/v2"
+              ]
+            }
+          }
+        },
+        "last_reviewed": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of last compliance review for this rule (ISO 8601 format: YYYY-MM-DD)",
+          "$comment": "Rules should be reviewed periodically (e.g., annually) to ensure continued accuracy and alignment with trade agreement provisions"
+        },
+        "reviewer": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{3,64}$",
+          "description": "Identifier of the person or board that last reviewed this rule",
+          "$comment": "Use kebab-case identifiers. Examples: compliance-board, trade-law-team, john-smith, customs-expert",
+          "examples": [
+            "compliance-board",
+            "trade-law-team",
+            "uk-compliance-board",
+            "customs-specialist"
+          ]
+        }
+      }
+    }
+  },
+  "definitions": {
+    "required_input": {
+      "type": "object",
+      "description": "Specification for a required material, component, or service input",
+      "$comment": "Defines inputs that must be present in the BOM for origin qualification. Includes HS classification and optional percentage limits.",
+      "required": [
+        "type",
+        "hs_code",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "material",
+            "component",
+            "service"
+          ],
+          "description": "Type of required input",
+          "$comment": "material: raw materials (e.g., steel, chemicals); component: manufactured parts (e.g., circuit boards); service: value-added services (e.g., design, engineering)"
+        },
+        "hs_code": {
+          "type": "string",
+          "pattern": "^[0-9]{4,8}$",
+          "description": "HS code for the required input (4 to 8 digits)",
+          "$comment": "Can be 4-digit heading, 6-digit subheading, or extended 8-digit national classification. No dots or dashes."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 512,
+          "description": "Clear description of the required input and its origin requirements",
+          "$comment": "Should specify whether input must be originating or can be non-originating"
+        },
+        "max_percentage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Optional maximum percentage of this input by value (0-100)",
+          "$comment": "If specified, this input cannot exceed the given percentage of total product value. Use null if no limit applies."
+        }
+      }
+    },
+    "regional_value_content": {
+      "type": "object",
+      "description": "Regional Value Content (RVC) calculation specification",
+      "$comment": "RVC measures the percentage of value added in the originating territory. Critical threshold for origin determination in most FTAs.",
+      "required": [
+        "method",
+        "threshold",
+        "calculation_window_days"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "build-up",
+            "build-down",
+            "net-cost"
+          ],
+          "description": "RVC calculation method specified by the trade agreement",
+          "$comment": "build-up: RVC = (VOM / EXW) × 100, where VOM = value of originating materials. build-down: RVC = ((EXW - VNM) / EXW) × 100, where VNM = value of non-originating materials. net-cost: RVC = ((NC - VNM) / NC) × 100, where NC = net cost of production. EXW = ex-works price."
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum RVC percentage required for origin qualification",
+          "$comment": "Common thresholds: 40% (low), 50% (medium), 60% (high), 75% (very high). Must meet or exceed this percentage to qualify.",
+          "examples": [
+            40.0,
+            50.0,
+            60.0,
+            75.0
+          ]
+        },
+        "calculation_window_days": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 1095,
+          "description": "Number of days over which RVC may be averaged or calculated",
+          "$comment": "Allows averaging of RVC over a period (e.g., fiscal year). Common values: 90 (quarter), 180 (half-year), 365 (annual). Range: 30 days (1 month) to 1095 days (3 years)."
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "description": "Specification for a manufacturing operation or process",
+      "$comment": "Represents a discrete production operation. Used in both required_operations and disallowed_operations lists.",
+      "required": [
+        "code",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]{3,32}$",
+          "description": "Standardized operation code identifier",
+          "$comment": "Use UPPER_SNAKE_CASE or UPPER-KEBAB-CASE. Examples: POLYMERIZATION, VULCANIZATION, CUTTING, WELDING, ASSEMBLY, PAINTING, PACKAGING",
+          "examples": [
+            "POLYMERIZATION",
+            "VULCANIZATION",
+            "EXTRUSION",
+            "CUTTING",
+            "WELDING",
+            "ASSEMBLY",
+            "PAINTING",
+            "PACKAGING",
+            "HEAT-TREATMENT"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 512,
+          "description": "Detailed description of the operation and its requirements",
+          "$comment": "Should clearly explain what the operation involves and where it must be performed (for required operations) or why it's insufficient (for disallowed operations)"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "2.0.0",
+      "metadata": {
+        "rule_id": "CETA-HS39-001",
+        "title": "Polymerization requirement for HS 39.01",
+        "description": "Goods classified under HS 3901 qualify for CETA preferential origin if polymerization of monomers occurs within the EU or Canada and the regional value content reaches 60 percent using the build-up method.",
+        "agreement": {
+          "code": "CETA",
+          "name": "Comprehensive Economic and Trade Agreement"
+        },
+        "hs_code": {
+          "chapter": "39",
+          "heading": "3901",
+          "subheading": "390110"
+        },
+        "jurisdiction": [
+          "EU",
+          "CA"
+        ],
+        "effective_from": "2024-01-01",
+        "effective_to": null,
+        "priority": 1,
+        "supersedes": []
+      },
+      "criteria": {
+        "bom": {
+          "required_inputs": [
+            {
+              "type": "material",
+              "hs_code": "2710",
+              "description": "Originating naphtha feedstock",
+              "max_percentage": 50.0
+            }
+          ],
+          "regional_value_content": {
+            "method": "build-up",
+            "threshold": 60.0,
+            "calculation_window_days": 365
+          }
+        },
+        "process": {
+          "required_operations": [
+            {
+              "code": "POLYMERIZATION",
+              "description": "Polymerization of monomers into polymers"
+            },
+            {
+              "code": "EXTRUSION",
+              "description": "Extrusion or pelletizing in originating territory"
+            }
+          ],
+          "disallowed_operations": [
+            {
+              "code": "PACKAGING",
+              "description": "Simple packaging operations"
+            }
+          ]
+        },
+        "documentation": {
+          "certificates": [
+            "EUR.1"
+          ],
+          "record_retention_days": 3650,
+          "additional_evidence": [
+            {
+              "type": "audit-report",
+              "description": "Third-party audit confirming production records"
+            }
+          ]
+        }
+      },
+      "decision": {
+        "verdicts": {
+          "qualified": {
+            "description": "Meets polymerization and regional value content thresholds",
+            "citations": [
+              {
+                "reference": "CETA Annex 5-A",
+                "section": "HS 39",
+                "url": "https://www.international.gc.ca/trade-commerce/trade-agreements-accords-commerciaux/agr-acc/ceta-aecg/text-texte/05.aspx"
+              }
+            ]
+          },
+          "disqualified": {
+            "reasons": [
+              {
+                "code": "INSUFFICIENT_RVC",
+                "description": "Regional value content below 60 percent",
+                "severity": "high"
+              },
+              {
+                "code": "MISSING_PROCESS",
+                "description": "Polymerization not performed in originating territory",
+                "severity": "critical"
+              }
+            ]
+          }
+        }
+      },
+      "audit": {
+        "traceability": {
+          "lineage_required": true,
+          "ledger_reference": "ledger://psra/version-ledger/v1"
+        },
+        "last_reviewed": "2025-01-15",
+        "reviewer": "compliance-board"
+      }
+    },
+    {
+      "version": "2.0.0",
+      "metadata": {
+        "rule_id": "TCA-HS40-002",
+        "title": "Vulcanized rubber components rule",
+        "description": "Articles of vulcanized rubber under HS 4011 qualify under the EU-UK Trade and Cooperation Agreement (TCA) when the value of non-originating materials does not exceed 40 percent and specified finishing processes occur within the originating territory.",
+        "agreement": {
+          "code": "TCA",
+          "name": "EU-UK Trade and Cooperation Agreement"
+        },
+        "hs_code": {
+          "chapter": "40",
+          "heading": "4011",
+          "subheading": "401110"
+        },
+        "jurisdiction": [
+          "EU",
+          "UK"
+        ],
+        "effective_from": "2024-06-01",
+        "effective_to": null,
+        "priority": 2,
+        "supersedes": [
+          "TCA-HS40-001"
+        ]
+      },
+      "criteria": {
+        "bom": {
+          "required_inputs": [],
+          "regional_value_content": {
+            "method": "net-cost",
+            "threshold": 60.0,
+            "calculation_window_days": 180
+          },
+          "non_originating_materials": {
+            "max_percentage": 40.0
+          }
+        },
+        "process": {
+          "required_operations": [
+            {
+              "code": "VULCANIZATION",
+              "description": "Vulcanization performed in EU or UK"
+            }
+          ],
+          "disallowed_operations": []
+        },
+        "documentation": {
+          "certificates": [
+            "UK-EUR1"
+          ],
+          "record_retention_days": 2190,
+          "additional_evidence": [
+            {
+              "type": "process-records",
+              "description": "Detailed finishing process log"
+            }
+          ]
+        }
+      },
+      "decision": {
+        "verdicts": {
+          "qualified": {
+            "description": "Meets net-cost and process requirements",
+            "citations": [
+              {
+                "reference": "TCA Annex ORIG-2",
+                "section": "HS 40",
+                "url": "https://www.gov.uk/government/publications/trade-and-cooperation-agreement-between-the-european-union-and-the-united-kingdom"
+              }
+            ]
+          },
+          "disqualified": {
+            "reasons": [
+              {
+                "code": "EXCESS_NON_ORIGINATING",
+                "description": "Non-originating materials exceed 40 percent",
+                "severity": "high"
+              },
+              {
+                "code": "PROCESS_NOT_COMPLETED",
+                "description": "Required finishing not executed in territory",
+                "severity": "medium"
+              }
+            ]
+          }
+        }
+      },
+      "audit": {
+        "traceability": {
+          "lineage_required": true,
+          "ledger_reference": "ledger://psra/version-ledger/v1"
+        },
+        "last_reviewed": "2025-01-20",
+        "reviewer": "uk-compliance-board"
+      }
+    },
+    {
+      "version": "2.1.0",
+      "metadata": {
+        "rule_id": "EUJP-HS84-015",
+        "title": "Electronic integrated circuits origin rule",
+        "description": "Electronic integrated circuits under HS 8542 qualify under the EU-Japan EPA when designed and manufactured in originating territory with minimum 50% RVC using build-down method. Wafer fabrication or assembly must occur in EU or Japan.",
+        "agreement": {
+          "code": "EU-JP-EPA",
+          "name": "EU-Japan Economic Partnership Agreement"
+        },
+        "hs_code": {
+          "chapter": "84",
+          "heading": "8542",
+          "subheading": "854231"
+        },
+        "jurisdiction": [
+          "EU",
+          "JP"
+        ],
+        "effective_from": "2024-03-01",
+        "effective_to": null,
+        "priority": 5,
+        "supersedes": []
+      },
+      "criteria": {
+        "bom": {
+          "required_inputs": [
+            {
+              "type": "component",
+              "hs_code": "8541",
+              "description": "Semiconductor wafers processed in originating territory",
+              "max_percentage": null
+            }
+          ],
+          "regional_value_content": {
+            "method": "build-down",
+            "threshold": 50.0,
+            "calculation_window_days": 365
+          },
+          "non_originating_materials": {
+            "max_percentage": 50.0
+          }
+        },
+        "process": {
+          "required_operations": [
+            {
+              "code": "WAFER-FABRICATION",
+              "description": "Semiconductor wafer fabrication including lithography and etching"
+            },
+            {
+              "code": "DIE-ASSEMBLY",
+              "description": "Die bonding and wire bonding or flip-chip assembly"
+            },
+            {
+              "code": "TESTING",
+              "description": "Electrical testing and quality assurance"
+            }
+          ],
+          "disallowed_operations": [
+            {
+              "code": "SIMPLE-TESTING",
+              "description": "Testing alone without fabrication or assembly"
+            },
+            {
+              "code": "MARKING",
+              "description": "Simple marking or labeling operations"
+            }
+          ]
+        },
+        "documentation": {
+          "certificates": [
+            "EUR.1",
+            "Certificate of Origin"
+          ],
+          "record_retention_days": 1825,
+          "additional_evidence": [
+            {
+              "type": "design-documentation",
+              "description": "Circuit design specifications and schematics"
+            },
+            {
+              "type": "manufacturing-records",
+              "description": "Wafer fabrication and assembly process logs"
+            },
+            {
+              "type": "supplier-declaration",
+              "description": "Supplier declarations for semiconductor materials"
+            }
+          ]
+        }
+      },
+      "decision": {
+        "verdicts": {
+          "qualified": {
+            "description": "Satisfies wafer fabrication, assembly, and 50% RVC requirements under EU-JP EPA product-specific rules for electronic integrated circuits",
+            "citations": [
+              {
+                "reference": "EU-JP EPA Annex 3-B",
+                "section": "Chapter 85 Product-Specific Rules",
+                "url": "https://trade.ec.europa.eu/doclib/docs/2018/august/tradoc_157228.pdf"
+              },
+              {
+                "reference": "EU-JP EPA Article 3.2",
+                "section": "Regional Value Content",
+                "url": "https://trade.ec.europa.eu/doclib/docs/2018/august/tradoc_157228.pdf"
+              }
+            ]
+          },
+          "disqualified": {
+            "reasons": [
+              {
+                "code": "INSUFFICIENT_RVC",
+                "description": "Regional value content below 50 percent threshold",
+                "severity": "high"
+              },
+              {
+                "code": "MISSING_FABRICATION",
+                "description": "Wafer fabrication not performed in EU or Japan",
+                "severity": "critical"
+              },
+              {
+                "code": "MISSING_ASSEMBLY",
+                "description": "Die assembly operations not performed in originating territory",
+                "severity": "high"
+              },
+              {
+                "code": "INSUFFICIENT_OPERATIONS",
+                "description": "Only disallowed operations performed (testing or marking only)",
+                "severity": "critical"
+              }
+            ]
+          }
+        }
+      },
+      "audit": {
+        "traceability": {
+          "lineage_required": true,
+          "ledger_reference": "ledger://psra/rules/eujp/hs84/015"
+        },
+        "last_reviewed": "2025-02-01",
+        "reviewer": "trade-law-team"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "realm": "sevensa",
+  "clientId": "rentguy-app",
+  "clientSecret": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.keycloak_client_secret }}{{ end }}",
+  "authServerUrl": "https://auth.sevensa.nl/auth",
+  "sslRequired": "external",
+  "resource": "rentguy-app",
+  "confidentialPort": 0,
+  "bearerOnly": false,
+  "verifyTokenAudience": true
+}

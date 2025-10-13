@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rentguy
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "sevensa-security-oauth2@kubernetescrd"
+spec:
+  rules:
+  - host: rentguy.sevensa.nl
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: rentguy-api
+            port:
+              name: http
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rentguy-frontend
+            port:
+              name: http
+  - host: onboarding.rentguy.sevensa.nl
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: rentguy-api
+            port:
+              name: http
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rentguy-frontend
+            port:
+              name: http
+  tls:
+  - hosts:
+    - rentguy.sevensa.nl
+    - onboarding.rentguy.sevensa.nl
+    secretName: rentguy-tls

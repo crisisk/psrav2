@@ -1,0 +1,449 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.psra.dev/psr_rule.schema.v2.json",
+  "title": "PSRA Rules-as-Code Specification v2",
+  "type": "object",
+  "required": [
+    "version",
+    "metadata",
+    "criteria",
+    "decision",
+    "audit"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^2\\.\\d+\\.\\d+$"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "rule_id",
+        "title",
+        "description",
+        "agreement",
+        "hs_code",
+        "jurisdiction",
+        "effective_from",
+        "priority",
+        "supersedes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,5}-HS[0-9]{2}-[0-9]{3}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10
+        },
+        "agreement": {
+          "type": "object",
+          "required": [
+            "code",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{2,10}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 5
+            }
+          }
+        },
+        "hs_code": {
+          "type": "object",
+          "required": [
+            "chapter",
+            "heading",
+            "subheading"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "chapter": {
+              "type": "string",
+              "pattern": "^[0-9]{2}$"
+            },
+            "heading": {
+              "type": "string",
+              "pattern": "^[0-9]{4}$"
+            },
+            "subheading": {
+              "type": "string",
+              "pattern": "^[0-9]{6}$"
+            }
+          }
+        },
+        "jurisdiction": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "uniqueItems": true
+        },
+        "effective_from": {
+          "type": "string",
+          "format": "date"
+        },
+        "effective_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2,5}-HS[0-9]{2}-[0-9]{3}$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "criteria": {
+      "type": "object",
+      "required": [
+        "bom",
+        "process",
+        "documentation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bom": {
+          "type": "object",
+          "required": [
+            "required_inputs",
+            "regional_value_content"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required_inputs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/required_input"
+              }
+            },
+            "regional_value_content": {
+              "$ref": "#/definitions/regional_value_content"
+            },
+            "non_originating_materials": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "max_percentage"
+              ],
+              "properties": {
+                "max_percentage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          }
+        },
+        "process": {
+          "type": "object",
+          "required": [
+            "required_operations",
+            "disallowed_operations"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required_operations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/operation"
+              }
+            },
+            "disallowed_operations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/operation"
+              }
+            }
+          }
+        },
+        "documentation": {
+          "type": "object",
+          "required": [
+            "certificates",
+            "record_retention_days"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "certificates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 2
+              }
+            },
+            "record_retention_days": {
+              "type": "integer",
+              "minimum": 365,
+              "maximum": 7300
+            },
+            "additional_evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "description"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "verdicts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "verdicts": {
+          "type": "object",
+          "required": [
+            "qualified",
+            "disqualified"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "qualified": {
+              "type": "object",
+              "required": [
+                "description",
+                "citations"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 10
+                },
+                "citations": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "reference"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                        "minLength": 5
+                      },
+                      "section": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "disqualified": {
+              "type": "object",
+              "required": [
+                "reasons"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reasons": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "description",
+                      "severity"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9_]{3,32}$"
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 5
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "critical"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "required": [
+        "traceability",
+        "last_reviewed",
+        "reviewer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "traceability": {
+          "type": "object",
+          "required": [
+            "lineage_required",
+            "ledger_reference"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "lineage_required": {
+              "type": "boolean"
+            },
+            "ledger_reference": {
+              "type": "string",
+              "pattern": "^ledger://[-/a-z0-9]+$"
+            }
+          }
+        },
+        "last_reviewed": {
+          "type": "string",
+          "format": "date"
+        },
+        "reviewer": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{3,64}$"
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "required_input": {
+      "type": "object",
+      "required": [
+        "type",
+        "hs_code",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "material",
+            "component",
+            "service"
+          ]
+        },
+        "hs_code": {
+          "type": "string",
+          "pattern": "^[0-9]{4,8}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5
+        },
+        "max_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "regional_value_content": {
+      "type": "object",
+      "required": [
+        "method",
+        "threshold",
+        "calculation_window_days"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "build-up",
+            "build-down",
+            "net-cost"
+          ]
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "calculation_window_days": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 1095
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "required": [
+        "code",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9_-]{3,32}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "code": "CETA",
+    "name": "Comprehensive Economic and Trade Agreement",
+    "description": "EU-Canada preferential agreement covering industrial goods, agriculture and services.",
+    "active": true
+  },
+  {
+    "code": "EU-UK-TCA",
+    "name": "EU-UK Trade and Cooperation Agreement",
+    "description": "Post-Brexit trade framework enabling preferential access for goods and services.",
+    "active": true
+  },
+  {
+    "code": "EU-JP-EPA",
+    "name": "EU-Japan Economic Partnership Agreement",
+    "description": "Comprehensive agreement providing tariff reductions and regulatory cooperation.",
+    "active": true
+  },
+  {
+    "code": "USMCA",
+    "name": "US-Mexico-Canada Agreement",
+    "description": "North American trade agreement replacing NAFTA with updated origin requirements.",
+    "active": true
+  },
+  {
+    "code": "RCEP",
+    "name": "Regional Comprehensive Economic Partnership",
+    "description": "Asia-Pacific agreement harmonising rules of origin across 15 countries.",
+    "active": true
+  }
+]

@@ -1,0 +1,121 @@
+import { useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
+import { tokens } from '@sevensa/design-tokens';
+
+interface ResponsiveTableProps {
+  children: React.ReactNode;
+  stickyFirstColumn?: boolean;
+}
+
+const TableWrapper = styled.div`
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+`;
+
+const ScrollContainer = styled.div`
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  /* Hide scrollbar */
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Ensure minimum touch target size */
+  td, th {
+    min-height: 44px;
+    min-width: 44px;
+    padding: ${tokens.spacing.s}px;
+  }
+
+  /* Sticky header */
+  thead th {
+    position: sticky;
+    top: 0;
+    background: ${tokens.colors.background.primary};
+    z-index: 1;
+  }
+`;
+
+const ShadowIndicator = styled.div<{
+  show: boolean;
+  position: 'left' | 'right';
+}>`
+  position: absolute;
+  top: 0;
+  ${props => props.position}: 0;
+  width: 20px;
+  height: 100%;
+  pointer-events: none;
+  opacity: ${props => (props.show ? 1 : 0)};
+  transition: opacity 0.2s;
+  background: linear-gradient(
+    to ${props => (props.position === 'left' ? 'right' : 'left')},
+    rgba(0, 0, 0, 0.1),
+    transparent
+  );
+`;
+
+const StyledTable = styled.table<{ stickyFirstColumn: boolean }>`
+  border-collapse: collapse;
+  width: 100%;
+
+  ${props =>
+    props.stickyFirstColumn &&
+    `
+    td:first-child,
+    th:first-child {
+      position: sticky;
+      left: 0;
+      background: ${tokens.colors.background.primary};
+      z-index: 1;
+    }
+  `}
+`;
+
+export const ResponsiveTable = ({
+  children,
+  stickyFirstColumn = false,
+}: ResponsiveTableProps) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftShadow, setShowLeftShadow] = useState(false);
+  const [showRightShadow, setShowRightShadow] = useState(false);
+
+  const updateShadows = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setShowLeftShadow(scrollLeft > 0);
+      setShowRightShadow(scrollLeft < scrollWidth - clientWidth);
+    }
+  };
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (scrollElement) {
+      updateShadows();
+      scrollElement.addEventListener('scroll', updateShadows);
+      window.addEventListener('resize', updateShadows);
+
+      return () => {
+        scrollElement.removeEventListener('scroll', updateShadows);
+        window.removeEventListener('resize', updateShadows);
+      };
+    }
+  }, []);
+
+  return (
+    <TableWrapper>
+      <ScrollContainer ref={scrollRef}>
+        <StyledTable stickyFirstColumn={stickyFirstColumn}>
+          {children}
+        </StyledTable>
+      </ScrollContainer>
+      
+      <ShadowIndicator show={showLeftShadow} position="left" />
+      <ShadowIndicator show={showRightShadow} position="right" />
+    </TableWrapper>
+  );
+};

@@ -1,0 +1,85 @@
+deployment:
+  replicas: 3
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+ingressRoute:
+  dashboard:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: traefik
+
+additionalArguments:
+  - "--api.dashboard=true"
+  - "--log.level=INFO"
+  - "--accesslog=true"
+  - "--accesslog.fields.headers.names.X-Forwarded-For=keep"
+  - "--providers.kubernetescrd.allowCrossNamespace=true"
+  - "--providers.kubernetesingress.ingressclass=traefik"
+  - "--metrics.prometheus=true"
+  - "--entrypoints.websecure.http.tls=true"
+  - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+  - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+  - "--entrypoints.web.http.redirections.entryPoint.permanent=true"
+
+ports:
+  web:
+    redirectTo: websecure
+  websecure:
+    tls:
+      enabled: true
+      certResolver: letsencrypt
+
+service:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "100Mi"
+  limits:
+    cpu: "300m"
+    memory: "300Mi"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - traefik
+          topologyKey: kubernetes.io/hostname
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: "sevensa-standard"
+
+certResolvers:
+  letsencrypt:
+    email: admin@sevensa.nl
+    storage: /data/acme.json
+    httpChallenge:
+      entryPoint: web
+
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: true
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: true
+    publishedService:
+      enabled: true

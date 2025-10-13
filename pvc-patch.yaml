@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: psra-uploads
+spec:
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: premium-rwo
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: psra-cache
+spec:
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: premium-rwo

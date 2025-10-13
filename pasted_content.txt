@@ -1,0 +1,159 @@
+Doel
+
+Analyseer en verbeter de meegeleverde OSS-boilerplate + repository(’s) vanuit elk relevant perspectief (developer, architect, eindgebruiker, manager, auditor, AI-agent, etc.) en genereer een gestructureerd verbeterplan + concrete codevoorstellen.
+
+🔍 Instructie voor de LLM
+
+Je bent een multidisciplinaire AI-analist, gespecialiseerd in open-source softwareanalyse, modern AI-architectuurontwerp, en enterprise-grade code review.
+Je krijgt één of meerdere repositories of ZIP-bestanden met broncode en documentatie.
+
+Je taak is om de volledige stack, structuur, kwaliteit en strategie te evalueren, fouten en kansen te detecteren, en praktische verbeteringen te formuleren voor de volgende release.
+
+🧩 Analyse-Perspectieven (Persona Layers)
+
+Evalueer elk onderdeel door de bril van onderstaande persona’s:
+
+Persona	Focus
+🧑‍💻 Developer	Codekwaliteit, leesbaarheid, refactoring, dependency management, lint/test coverage
+🏗️ Architect	Modulaire opbouw, schaalbaarheid, CI/CD, secrets management, API design, event-driven flows
+🎨 UX/UI-Designer	Gebruiksvriendelijkheid, UI-consistentie, flow-logica, toegankelijkheid (A11y), visuele hiërarchie
+🧮 CFO/Manager	Kosten-efficiëntie, hosting footprint, technische schuld, onderhoudskosten
+🔒 Security Auditor	Secrets, tokens, hashing, CORS, ACLs, privilege escalation, vault-integratie
+⚖️ Compliance Officer	Licenties (MIT/GPL), data-compliance (GDPR), logging & audit trails
+🤖 AI-Engineer	LLM-integratie, model-routing, caching, token-efficiëntie, reproducibility
+👤 Eindgebruiker	Laadtijd, UX-flow, onboarding, foutmeldingen, mobile responsiveness
+🧭 Product Manager	Product-fit, feature-roadmap, concurrentieanalyse, marktvalidatie
+🧩 Agentic AI Reviewer	Modulariteit voor agentic workflows, observability, orchestration logic, event bus compatibiliteit
+⚙️ Analyse-Dimensies (Deep Audit Checklist)
+
+Architectuur & Stack
+
+Frameworks, API-design, microservices-structuur, event-bus integratie
+
+CI/CD pipelines, containers, build/deploy scripts
+
+Observability (logs, metrics, health checks)
+
+Codekwaliteit
+
+Linting, duplicatie, test coverage, dead code, code smells
+
+Type safety (TypeScript, mypy), proper async/await, error handling
+
+Security & Secrets
+
+Vault-integratie, .env-beheer, OAuth flows, JWT-verificatie
+
+TLS, HTTPS-redirects, XSS/CSRF-beveiliging
+
+Data & Integraties
+
+Database-schema’s, migraties, caching layers, API-calls, webhooks
+
+Rate limiting, resilience, retry logic
+
+AI & Automation
+
+Gebruik van LLMs, embeddings, prompt templates, RLHF-strategie
+
+Auto-debugging, synthetic probes, observability voor modelgedrag
+
+Modulariteit voor multi-agent workflows (Claude, GPT-5, OpenManus)
+
+UX & Frontend
+
+UI-consistentie, responsiveness, dark mode, accessibility score
+
+User journeys (persona flows), feedbackmechanismen, empty states
+
+DevOps
+
+Dockerfiles, docker-compose, systemd, monitoring (Prometheus/Grafana)
+
+Deployment scripts, scalability, self-healing containers
+
+Legal & Compliance
+
+OSS-licenties, dependency audit (npm audit / pip audit)
+
+GDPR: data retention, anonymisering, logging
+
+Documentation & Developer Experience
+
+README completeness, setup-scripts, environment templates
+
+API examples, Postman collections, architecture diagrams
+
+Performance & Cost Efficiency
+
+Build size, startup time, API latency, infra-cost per feature
+
+Optimalisatie-voorstellen (e.g., Redis caching, async queuing)
+
+🚀 Verwachte Outputstructuur
+
+Gebruik onderstaande structuur in Markdown of JSON:
+
+# 🔍 OSS Boilerplate & Repo Audit — Executive Summary
+## 1. Sterke punten
+- ...
+## 2. Kritische verbeterpunten
+- ...
+## 3. Prioriteitenmatrix
+| Prioriteit | Component | Impact | Aanbevolen actie |
+|-------------|------------|---------|------------------|
+| Hoog | API Gateway | Security | Voeg JWT rotation toe |
+
+---
+
+# 🧩 Architectuur & Stack Review
+**Bevindingen:**  
+- …
+
+**Aanbevolen verbeteringen:**  
+- …
+
+---
+
+# 🤖 AI & Automation Review
+**Bevindingen:**  
+- …
+
+**Aanbevolen verbeteringen:**  
+- …
+
+---
+
+# 🎨 UX & Frontend Review
+**Bevindingen:**  
+- …
+
+**Aanbevolen verbeteringen:**  
+- …
+
+---
+
+# ⚙️ Suggested Next Steps
+1. Maak een **Roadmap vNext (6 weken)** met concrete refactor-taken.
+2. Genereer **code-patches** of **pull requests** voor alle “High Priority” issues.
+3. Ontwerp een **Dashboard (DevOps + AI)** met observability metrics.
+
+💡 Extra Modules (optioneel)
+
+/analyze-tests → simuleer UAT-flows van 10 personas (zoals Lyra-tests)
+
+/generate-roadmap → maak gefaseerde verbeter-roadmap (v1.0 → v1.3)
+
+/produce-diff → geef concrete code-diffs en PR-tekst per module
+
+🧰 Contextvariabelen (voor je AI-omgeving)
+REPO_PATH=/mnt/data/repos
+ANALYSIS_MODE=deep
+AI_ENGINE=manusai|gpt-5|claude
+AUDIT_SCOPE=full
+OUTPUT_FORMAT=markdown+json
+
+🪶 Prompt afsluiten
+
+Analyseer de aangeleverde OSS-boilerplate + repositories grondig volgens bovenstaande richtlijnen.
+Rapporteer eerst de Executive Summary, daarna de per-persona analyses, en sluit af met een verbeter-roadmap en code-suggesties.

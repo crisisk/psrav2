@@ -1,0 +1,67 @@
+version: "2.0.0"
+metadata:
+  rule_id: "TCA-HS40-002"
+  title: "Vulcanized rubber components rule"
+  description: |
+    Articles of vulcanized rubber under HS 4011 qualify under the EU-UK Trade and
+    Cooperation Agreement (TCA) when the value of non-originating materials does
+    not exceed 40 percent and specified finishing processes occur within the
+    originating territory.
+  agreement:
+    code: "TCA"
+    name: "EU-UK Trade and Cooperation Agreement"
+  hs_code:
+    chapter: "40"
+    heading: "4011"
+    subheading: "401110"
+  jurisdiction:
+    - "EU"
+    - "UK"
+  effective_from: "2024-06-01"
+  effective_to: null
+  priority: 2
+  supersedes:
+    - "TCA-HS40-001"
+criteria:
+  bom:
+    required_inputs: []
+    regional_value_content:
+      method: "net-cost"
+      threshold: 60.0
+      calculation_window_days: 180
+    non_originating_materials:
+      max_percentage: 40.0
+  process:
+    required_operations:
+      - code: "VULCANIZATION"
+        description: "Vulcanization performed in EU or UK"
+    disallowed_operations: []
+  documentation:
+    certificates:
+      - "UK-EUR1"
+    record_retention_days: 2190
+    additional_evidence:
+      - type: "process-records"
+        description: "Detailed finishing process log"
+decision:
+  verdicts:
+    qualified:
+      description: "Meets net-cost and process requirements"
+      citations:
+        - reference: "TCA Annex ORIG-2"
+          section: "HS 40"
+          url: "https://www.gov.uk/government/publications/trade-and-cooperation-agreement-between-the-european-union-and-the-united-kingdom"
+    disqualified:
+      reasons:
+        - code: "EXCESS_NON_ORIGINATING"
+          description: "Non-originating materials exceed 40 percent"
+          severity: "high"
+        - code: "PROCESS_NOT_COMPLETED"
+          description: "Required finishing not executed in territory"
+          severity: "medium"
+audit:
+  traceability:
+    lineage_required: true
+    ledger_reference: "ledger://psra/version-ledger/v1"
+  last_reviewed: "2025-01-20"
+  reviewer: "uk-compliance-board"

@@ -1,0 +1,184 @@
+version: '3.8'
+
+# Docker Compose Configuration for AI Orchestration with Network Segmentation
+# Created: 2025-10-09
+# Last Updated: 2025-10-09
+
+services:
+  # LangGraph - AI Reasoning Engine
+  langgraph:
+    image: sevensa/langgraph:latest
+    container_name: langgraph
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://ai-redis:6379
+      - REDIS_PASSWORD=${AI_REDIS_PASSWORD}
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=ai
+      - VAULT_ROLE_ID=${AI_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${AI_VAULT_SECRET_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    networks:
+      - ai_network
+      - shared_network
+    depends_on:
+      - ai-redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.langgraph.rule=Host(`langgraph.ai.sevensa.nl`)"
+      - "traefik.http.routers.langgraph.entrypoints=websecure"
+      - "traefik.http.routers.langgraph.tls=true"
+      - "traefik.http.services.langgraph.loadbalancer.server.port=8000"
+      - "traefik.http.routers.langgraph.middlewares=oauth2-auth@file"
+
+  # N8N - Integration and Automation Backbone
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=n8n.ai.sevensa.nl
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=ai-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${AI_DB_PASSWORD}
+      - WEBHOOK_URL=https://n8n.ai.sevensa.nl
+      - EXECUTIONS_PROCESS=main
+      - GENERIC_TIMEZONE=Europe/Amsterdam
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - ai_network
+      - traefik_network
+      - shared_network
+    depends_on:
+      - ai-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.ai.sevensa.nl`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.http.routers.n8n.middlewares=oauth2-auth@file"
+
+  # Claude Chat
+  claude-chat:
+    image: sevensa/claude-chat:latest
+    container_name: claude-chat
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://ai-redis:6379
+      - REDIS_PASSWORD=${AI_REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://ai:${AI_DB_PASSWORD}@ai-db:5432/claude
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=ai
+      - VAULT_ROLE_ID=${AI_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${AI_VAULT_SECRET_ID}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=ai-client
+      - KEYCLOAK_CLIENT_SECRET=${AI_CLIENT_SECRET}
+    networks:
+      - ai_network
+      - traefik_network
+      - shared_network
+    depends_on:
+      - ai-db
+      - ai-redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.claude-chat.rule=Host(`claude.ai.sevensa.nl`)"
+      - "traefik.http.routers.claude-chat.entrypoints=websecure"
+      - "traefik.http.routers.claude-chat.tls=true"
+      - "traefik.http.services.claude-chat.loadbalancer.server.port=3000"
+      - "traefik.http.routers.claude-chat.middlewares=oauth2-auth@file"
+
+  # Trading Dashboard
+  trading-dashboard:
+    image: sevensa/trading-dashboard:latest
+    container_name: trading-dashboard
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://ai:${AI_DB_PASSWORD}@ai-db:5432/trading
+      - REDIS_URL=redis://ai-redis:6379
+      - REDIS_PASSWORD=${AI_REDIS_PASSWORD}
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_NAMESPACE=ai
+      - VAULT_ROLE_ID=${AI_VAULT_ROLE_ID}
+      - VAULT_SECRET_ID=${AI_VAULT_SECRET_ID}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=sevensa
+      - KEYCLOAK_CLIENT_ID=ai-client
+      - KEYCLOAK_CLIENT_SECRET=${AI_CLIENT_SECRET}
+    networks:
+      - ai_network
+      - traefik_network
+      - shared_network
+    depends_on:
+      - ai-db
+      - ai-redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trading-dashboard.rule=Host(`trading.ai.sevensa.nl`)"
+      - "traefik.http.routers.trading-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.trading-dashboard.tls=true"
+      - "traefik.http.services.trading-dashboard.loadbalancer.server.port=3000"
+      - "traefik.http.routers.trading-dashboard.middlewares=oauth2-auth@file"
+
+  # AI Database
+  ai-db:
+    image: postgres:14-alpine
+    container_name: ai-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=ai
+      - POSTGRES_PASSWORD=${AI_DB_PASSWORD}
+      - POSTGRES_DB=ai
+    volumes:
+      - ai-db-data:/var/lib/postgresql/data
+    networks:
+      - ai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Redis
+  ai-redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${AI_REDIS_PASSWORD}
+    volumes:
+      - ai-redis-data:/data
+    networks:
+      - ai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  n8n-data:
+  ai-db-data:
+  ai-redis-data:
+
+networks:
+  ai_network:
+    external: true
+  traefik_network:
+    external: true
+  shared_network:
+    external: true

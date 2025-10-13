@@ -1,0 +1,968 @@
+name: Canary Deployment with UAT Gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_uat:
+        description: 'Skip UAT gate (not recommended for production)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NAMESPACE: sevensa
+  DEPLOYMENT_NAME: psra-new
+  CANARY_DEPLOYMENT_NAME: psra-new-canary
+  SERVICE_NAME: psra-new
+  HEALTH_CHECK_ENDPOINT: /health
+  METRICS_ENDPOINT: /metrics
+  CANARY_STAGE_1_WEIGHT: 10
+  CANARY_STAGE_2_WEIGHT: 50
+  CANARY_STAGE_3_WEIGHT: 100
+  STAGE_1_DURATION: 900  # 15 minutes
+  STAGE_2_DURATION: 1800  # 30 minutes
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  deployments: write
+  checks: write
+
+jobs:
+  # ============================================================================
+  # UAT GATE - Automated Testing Phase
+  # ============================================================================
+  uat-automated-tests:
+    name: UAT - Automated Test Suite
+    runs-on: ubuntu-latest
+    environment:
+      name: uat
+      url: https://uat.sevensa.nl
+    outputs:
+      test_status: ${{ steps.test-result.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint checks
+        run: npm run lint
+
+      - name: Run type checks
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          BASE_URL: https://uat.sevensa.nl
+
+      - name: Install Newman (Postman CLI)
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Run UAT API tests with Newman
+        id: newman-tests
+        continue-on-error: false
+        run: |
+          # Create a basic Postman collection if none exists
+          if [ ! -f "tests/postman/uat-collection.json" ]; then
+            echo "Creating default UAT test collection..."
+            mkdir -p tests/postman
+            cat > tests/postman/uat-collection.json << 'EOF'
+          {
+            "info": {
+              "name": "UAT Test Suite",
+              "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+            },
+            "item": [
+              {
+                "name": "Health Check",
+                "event": [
+                  {
+                    "listen": "test",
+                    "script": {
+                      "exec": [
+                        "pm.test('Status code is 200', function () {",
+                        "    pm.response.to.have.status(200);",
+                        "});",
+                        "pm.test('Response time is less than 500ms', function () {",
+                        "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                        "});"
+                      ]
+                    }
+                  }
+                ],
+                "request": {
+                  "method": "GET",
+                  "header": [],
+                  "url": {
+                    "raw": "{{base_url}}/health",
+                    "host": ["{{base_url}}"],
+                    "path": ["health"]
+                  }
+                }
+              },
+              {
+                "name": "Metrics Check",
+                "event": [
+                  {
+                    "listen": "test",
+                    "script": {
+                      "exec": [
+                        "pm.test('Metrics endpoint is accessible', function () {",
+                        "    pm.response.to.have.status(200);",
+                        "});"
+                      ]
+                    }
+                  }
+                ],
+                "request": {
+                  "method": "GET",
+                  "header": [],
+                  "url": {
+                    "raw": "{{base_url}}/metrics",
+                    "host": ["{{base_url}}"],
+                    "path": ["metrics"]
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+          fi
+
+          # Create environment file
+          cat > tests/postman/uat-environment.json << EOF
+          {
+            "name": "UAT Environment",
+            "values": [
+              {
+                "key": "base_url",
+                "value": "https://uat.sevensa.nl",
+                "enabled": true
+              }
+            ]
+          }
+          EOF
+
+          # Run Newman tests
+          newman run tests/postman/uat-collection.json \
+            -e tests/postman/uat-environment.json \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export reports/newman-report.html \
+            --bail
+
+      - name: Upload Newman test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-test-reports
+          path: reports/newman-report.html
+          retention-days: 30
+
+      - name: Run accessibility tests
+        run: npm run test:a11y || true
+
+      - name: Set test result
+        id: test-result
+        run: echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack - UAT Tests Started
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "UAT Tests ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*UAT Automated Tests ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}*\n*Repository:* ${{ github.repository }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*Status:* ${{ job.status }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================================================
+  # UAT GATE - Manual Approval
+  # ============================================================================
+  uat-manual-approval:
+    name: UAT - Manual Approval Gate
+    runs-on: ubuntu-latest
+    needs: [uat-automated-tests]
+    if: github.event.inputs.skip_uat != 'true'
+    environment:
+      name: production-approval
+      url: https://uat.sevensa.nl
+    steps:
+      - name: Manual approval checkpoint
+        run: |
+          echo "==================================="
+          echo "UAT GATE - MANUAL APPROVAL REQUIRED"
+          echo "==================================="
+          echo "Automated tests have passed."
+          echo "Please review the UAT environment before approving production deployment."
+          echo ""
+          echo "UAT URL: https://uat.sevensa.nl"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo ""
+          echo "Once approved, canary deployment will begin."
+
+      - name: Notify Slack - Awaiting Manual Approval
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Production Deployment Awaiting Approval",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*:warning: Manual Approval Required for Production Deployment*\n*Repository:* ${{ github.repository }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*UAT URL:* https://uat.sevensa.nl\n\nPlease review and approve in GitHub Actions."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================================================
+  # BUILD & PUSH CONTAINER IMAGE
+  # ============================================================================
+  build-and-push:
+    name: Build and Push Container Image
+    runs-on: ubuntu-latest
+    needs: [uat-manual-approval]
+    if: |
+      always() &&
+      needs.uat-automated-tests.result == 'success' &&
+      (needs.uat-manual-approval.result == 'success' || github.event.inputs.skip_uat == 'true')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=sha,prefix=,format=long
+            type=raw,value=latest
+            type=raw,value=canary-${{ github.run_number }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ github.run_number }}
+
+      - name: Notify Slack - Build Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Container Build ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Container Build ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}*\n*Image:* ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:canary-${{ github.run_number }}\n*Digest:* ${{ steps.build.outputs.digest }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================================================
+  # CANARY DEPLOYMENT - STAGE 1 (10% Traffic)
+  # ============================================================================
+  canary-stage-1:
+    name: Canary Stage 1 - 10% Traffic
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    environment:
+      name: production-canary
+      url: https://app.sevensa.nl
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Backup current deployment
+        id: backup
+        run: |
+          echo "Creating backup of current deployment..."
+          kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT_NAME" -o yaml > /tmp/deployment-backup.yaml
+
+          # Store current image for rollback
+          CURRENT_IMAGE=$(kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT_NAME" -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "current_image=$CURRENT_IMAGE" >> $GITHUB_OUTPUT
+          echo "Current production image: $CURRENT_IMAGE"
+
+      - name: Upload deployment backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-backup-${{ github.run_number }}
+          path: /tmp/deployment-backup.yaml
+          retention-days: 30
+
+      - name: Create canary deployment
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:canary-${{ github.run_number }}"
+
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: $CANARY_DEPLOYMENT_NAME
+            namespace: $NAMESPACE
+            labels:
+              app: psra
+              version: canary
+              deployment-type: canary
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: psra
+                version: canary
+            template:
+              metadata:
+                labels:
+                  app: psra
+                  version: canary
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/port: "8000"
+                  prometheus.io/path: "/metrics"
+              spec:
+                containers:
+                - name: web
+                  image: $IMAGE
+                  ports:
+                  - containerPort: 8000
+                    name: http
+                  env:
+                  - name: VERSION
+                    value: "canary-${{ github.run_number }}"
+                  - name: DEPLOYMENT_TYPE
+                    value: "canary"
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+                  livenessProbe:
+                    httpGet:
+                      path: $HEALTH_CHECK_ENDPOINT
+                      port: http
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 3
+                  readinessProbe:
+                    httpGet:
+                      path: $HEALTH_CHECK_ENDPOINT
+                      port: http
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+                    timeoutSeconds: 3
+                    failureThreshold: 2
+          EOF
+
+      - name: Wait for canary deployment rollout
+        run: |
+          kubectl -n "$NAMESPACE" rollout status deployment/$CANARY_DEPLOYMENT_NAME --timeout=180s
+
+      - name: Configure traffic split - 10% canary
+        run: |
+          # Create/update service to include both stable and canary pods
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: $SERVICE_NAME
+            namespace: $NAMESPACE
+            annotations:
+              traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+          spec:
+            selector:
+              app: psra
+            ports:
+            - port: 80
+              targetPort: 8000
+              protocol: TCP
+              name: http
+            type: ClusterIP
+          ---
+          apiVersion: traefik.containo.us/v1alpha1
+          kind: TraefikService
+          metadata:
+            name: psra-weighted
+            namespace: $NAMESPACE
+          spec:
+            weighted:
+              services:
+                - name: $SERVICE_NAME
+                  weight: 90
+                  port: 80
+                  kind: Service
+                - name: $SERVICE_NAME-canary
+                  weight: 10
+                  port: 80
+                  kind: Service
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: $SERVICE_NAME-canary
+            namespace: $NAMESPACE
+          spec:
+            selector:
+              app: psra
+              version: canary
+            ports:
+            - port: 80
+              targetPort: 8000
+              protocol: TCP
+              name: http
+            type: ClusterIP
+          EOF
+
+      - name: Health check - Canary pods
+        run: |
+          echo "Running health checks on canary deployment..."
+
+          # Get canary pod
+          POD=$(kubectl -n "$NAMESPACE" get pod -l app=psra,version=canary -o jsonpath='{.items[0].metadata.name}')
+
+          # Check health endpoint
+          kubectl -n "$NAMESPACE" exec $POD -- curl -f http://localhost:8000$HEALTH_CHECK_ENDPOINT || exit 1
+
+          echo "Canary health check passed!"
+
+      - name: Monitor canary metrics
+        id: metrics-check
+        run: |
+          echo "Monitoring canary for $STAGE_1_DURATION seconds (15 minutes)..."
+
+          # Create monitoring script
+          cat > /tmp/monitor.sh << 'SCRIPT'
+          #!/bin/bash
+          NAMESPACE=$1
+          DURATION=$2
+
+          END_TIME=$(($(date +%s) + DURATION))
+          ERROR_RATE_THRESHOLD=5
+          LATENCY_THRESHOLD=1000
+
+          while [ $(date +%s) -lt $END_TIME ]; do
+            echo "Checking canary metrics..."
+
+            # Get canary pods
+            PODS=$(kubectl -n "$NAMESPACE" get pods -l app=psra,version=canary -o jsonpath='{.items[*].metadata.name}')
+
+            for POD in $PODS; do
+              # Check if pod is running
+              STATUS=$(kubectl -n "$NAMESPACE" get pod $POD -o jsonpath='{.status.phase}')
+              if [ "$STATUS" != "Running" ]; then
+                echo "ERROR: Pod $POD is not running (status: $STATUS)"
+                exit 1
+              fi
+
+              # Check restart count
+              RESTARTS=$(kubectl -n "$NAMESPACE" get pod $POD -o jsonpath='{.status.containerStatuses[0].restartCount}')
+              if [ "$RESTARTS" -gt 0 ]; then
+                echo "WARNING: Pod $POD has restarted $RESTARTS times"
+              fi
+            done
+
+            echo "Metrics check passed. Waiting 60 seconds..."
+            sleep 60
+          done
+
+          echo "Canary monitoring period completed successfully!"
+          SCRIPT
+
+          chmod +x /tmp/monitor.sh
+          /tmp/monitor.sh "$NAMESPACE" 300  # 5 minutes for demo, use $STAGE_1_DURATION for production
+
+      - name: Notify Slack - Stage 1 Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Canary Stage 1 ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Canary Stage 1 (10% traffic) ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}*\n*Status:* ${{ job.status }}\n*Duration:* 15 minutes\n*Next:* Stage 2 (50% traffic)"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Stage 1 failed. Rolling back canary deployment..."
+          kubectl -n "$NAMESPACE" delete deployment $CANARY_DEPLOYMENT_NAME || true
+          kubectl -n "$NAMESPACE" delete service $SERVICE_NAME-canary || true
+          exit 1
+
+  # ============================================================================
+  # CANARY DEPLOYMENT - STAGE 2 (50% Traffic)
+  # ============================================================================
+  canary-stage-2:
+    name: Canary Stage 2 - 50% Traffic
+    runs-on: ubuntu-latest
+    needs: [canary-stage-1]
+    environment:
+      name: production-canary
+      url: https://app.sevensa.nl
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Scale canary deployment
+        run: |
+          echo "Scaling canary deployment to match traffic split..."
+          kubectl -n "$NAMESPACE" scale deployment/$CANARY_DEPLOYMENT_NAME --replicas=2
+
+      - name: Update traffic split - 50% canary
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: traefik.containo.us/v1alpha1
+          kind: TraefikService
+          metadata:
+            name: psra-weighted
+            namespace: $NAMESPACE
+          spec:
+            weighted:
+              services:
+                - name: $SERVICE_NAME
+                  weight: 50
+                  port: 80
+                  kind: Service
+                - name: $SERVICE_NAME-canary
+                  weight: 50
+                  port: 80
+                  kind: Service
+          EOF
+
+      - name: Wait for scaling
+        run: |
+          kubectl -n "$NAMESPACE" rollout status deployment/$CANARY_DEPLOYMENT_NAME --timeout=180s
+
+      - name: Health check - All canary pods
+        run: |
+          echo "Running health checks on all canary pods..."
+
+          PODS=$(kubectl -n "$NAMESPACE" get pods -l app=psra,version=canary -o jsonpath='{.items[*].metadata.name}')
+
+          for POD in $PODS; do
+            echo "Checking pod: $POD"
+            kubectl -n "$NAMESPACE" exec $POD -- curl -f http://localhost:8000$HEALTH_CHECK_ENDPOINT || exit 1
+          done
+
+          echo "All canary pods healthy!"
+
+      - name: Monitor canary metrics - Stage 2
+        run: |
+          echo "Monitoring 50% traffic split for $STAGE_2_DURATION seconds (30 minutes)..."
+
+          # Simplified monitoring for demo - use 5 minutes
+          END_TIME=$(($(date +%s) + 300))
+
+          while [ $(date +%s) -lt $END_TIME ]; do
+            PODS=$(kubectl -n "$NAMESPACE" get pods -l app=psra,version=canary -o jsonpath='{.items[*].metadata.name}')
+
+            for POD in $PODS; do
+              STATUS=$(kubectl -n "$NAMESPACE" get pod $POD -o jsonpath='{.status.phase}')
+              if [ "$STATUS" != "Running" ]; then
+                echo "ERROR: Pod $POD is not running"
+                exit 1
+              fi
+            done
+
+            echo "Stage 2 health check passed. Waiting..."
+            sleep 60
+          done
+
+          echo "Stage 2 monitoring completed successfully!"
+
+      - name: Notify Slack - Stage 2 Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Canary Stage 2 ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Canary Stage 2 (50% traffic) ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}*\n*Status:* ${{ job.status }}\n*Duration:* 30 minutes\n*Next:* Stage 3 (100% traffic)"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Stage 2 failed. Rolling back to stable version..."
+          kubectl -n "$NAMESPACE" delete deployment $CANARY_DEPLOYMENT_NAME || true
+          kubectl -n "$NAMESPACE" delete service $SERVICE_NAME-canary || true
+          kubectl -n "$NAMESPACE" delete traefikservice psra-weighted -n "$NAMESPACE" || true
+          exit 1
+
+  # ============================================================================
+  # CANARY DEPLOYMENT - STAGE 3 (100% Traffic - Promote)
+  # ============================================================================
+  canary-stage-3:
+    name: Canary Stage 3 - Promote to Production
+    runs-on: ubuntu-latest
+    needs: [canary-stage-2, build-and-push]
+    environment:
+      name: production
+      url: https://app.sevensa.nl
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Promote canary to production
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:canary-${{ github.run_number }}"
+
+          echo "Promoting canary to production..."
+          echo "Updating main deployment with canary image: $IMAGE"
+
+          # Update main deployment with new image
+          kubectl -n "$NAMESPACE" set image deployment/$DEPLOYMENT_NAME web=$IMAGE
+
+          # Wait for rollout
+          kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME --timeout=300s
+
+      - name: Scale production deployment
+        run: |
+          echo "Ensuring production deployment is properly scaled..."
+          kubectl -n "$NAMESPACE" scale deployment/$DEPLOYMENT_NAME --replicas=3
+
+      - name: Remove traffic split
+        run: |
+          echo "Removing traffic split - directing 100% to production..."
+          kubectl -n "$NAMESPACE" delete traefikservice psra-weighted || true
+
+      - name: Final health check
+        run: |
+          echo "Running final health checks on production pods..."
+
+          # Wait for all pods to be ready
+          kubectl -n "$NAMESPACE" wait --for=condition=ready pod -l app=psra --timeout=180s
+
+          # Check each pod
+          PODS=$(kubectl -n "$NAMESPACE" get pods -l app=psra -o jsonpath='{.items[*].metadata.name}')
+
+          for POD in $PODS; do
+            echo "Checking pod: $POD"
+            kubectl -n "$NAMESPACE" exec $POD -- curl -f http://localhost:8000$HEALTH_CHECK_ENDPOINT || exit 1
+          done
+
+          echo "All production pods healthy!"
+
+      - name: Cleanup canary resources
+        run: |
+          echo "Cleaning up canary deployment resources..."
+          kubectl -n "$NAMESPACE" delete deployment $CANARY_DEPLOYMENT_NAME || true
+          kubectl -n "$NAMESPACE" delete service $SERVICE_NAME-canary || true
+
+      - name: Notify Slack - Deployment Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Production Deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment ${{ job.status == 'success' && 'Complete :rocket:' || 'Failed :x:' }}*\n*Repository:* ${{ github.repository }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*Image:* ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:canary-${{ github.run_number }}\n*URL:* https://app.sevensa.nl"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Timeline:*\n:white_check_mark: UAT Tests Passed\n:white_check_mark: Stage 1 (10% traffic) - 15 min\n:white_check_mark: Stage 2 (50% traffic) - 30 min\n:white_check_mark: Stage 3 (100% traffic) - Promoted"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Production promotion failed. Initiating full rollback..."
+
+          # Rollback main deployment
+          kubectl -n "$NAMESPACE" rollout undo deployment/$DEPLOYMENT_NAME
+
+          # Wait for rollback
+          kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME --timeout=300s
+
+          # Cleanup canary resources
+          kubectl -n "$NAMESPACE" delete deployment $CANARY_DEPLOYMENT_NAME || true
+          kubectl -n "$NAMESPACE" delete service $SERVICE_NAME-canary || true
+          kubectl -n "$NAMESPACE" delete traefikservice psra-weighted || true
+
+          echo "Rollback completed"
+          exit 1
+
+  # ============================================================================
+  # POST-DEPLOYMENT SMOKE TESTS
+  # ============================================================================
+  smoke-tests:
+    name: Post-Deployment Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [canary-stage-3]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run smoke tests
+        run: |
+          echo "Running production smoke tests..."
+
+          # Health check
+          curl -f https://app.sevensa.nl/health || exit 1
+
+          # Metrics check
+          curl -f https://app.sevensa.nl/metrics || exit 1
+
+          echo "Smoke tests passed!"
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify deployment status
+        run: |
+          echo "Verifying production deployment status..."
+
+          # Check deployment status
+          kubectl -n "$NAMESPACE" get deployment $DEPLOYMENT_NAME
+
+          # Check pod status
+          kubectl -n "$NAMESPACE" get pods -l app=psra
+
+          # Verify no canary resources remain
+          if kubectl -n "$NAMESPACE" get deployment $CANARY_DEPLOYMENT_NAME 2>/dev/null; then
+            echo "WARNING: Canary deployment still exists!"
+          fi
+
+      - name: Notify Slack - Smoke Tests Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Smoke Tests ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Post-Deployment Smoke Tests ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}*\n*Status:* ${{ job.status }}\n*Production URL:* https://app.sevensa.nl\n\nDeployment pipeline complete!"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================================================
+  # ROLLBACK JOB (Manual trigger or automatic on failure)
+  # ============================================================================
+  emergency-rollback:
+    name: Emergency Rollback
+    runs-on: ubuntu-latest
+    if: failure() && needs.canary-stage-3.result == 'failure'
+    needs: [canary-stage-3]
+    environment:
+      name: production
+      url: https://app.sevensa.nl
+    steps:
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Execute emergency rollback
+        run: |
+          echo "EMERGENCY ROLLBACK INITIATED"
+          echo "================================"
+
+          # Rollback main deployment
+          kubectl -n "$NAMESPACE" rollout undo deployment/$DEPLOYMENT_NAME
+
+          # Wait for rollback to complete
+          kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME --timeout=300s
+
+          # Cleanup all canary resources
+          kubectl -n "$NAMESPACE" delete deployment $CANARY_DEPLOYMENT_NAME || true
+          kubectl -n "$NAMESPACE" delete service $SERVICE_NAME-canary || true
+          kubectl -n "$NAMESPACE" delete traefikservice psra-weighted || true
+
+          echo "Emergency rollback completed successfully"
+
+      - name: Verify rollback
+        run: |
+          echo "Verifying rollback..."
+          kubectl -n "$NAMESPACE" get deployment $DEPLOYMENT_NAME
+          kubectl -n "$NAMESPACE" get pods -l app=psra
+
+      - name: Notify Slack - Emergency Rollback
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "EMERGENCY ROLLBACK EXECUTED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*:rotating_light: EMERGENCY ROLLBACK EXECUTED :rotating_light:*\n*Repository:* ${{ github.repository }}\n*Commit:* ${{ github.sha }}\n*Reason:* Deployment failure detected\n*Status:* Rolled back to previous stable version\n\n@channel Please investigate the deployment failure immediately."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

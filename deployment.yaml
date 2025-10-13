@@ -1,0 +1,201 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentguy-api
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rentguy
+      component: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: rentguy
+        component: api
+    spec:
+      serviceAccountName: rentguy-sa
+      containers:
+      - name: api
+        image: sevensa/rentguy-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "3000"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-db-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-redis-credentials
+              key: url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-jwt
+              key: secret
+        - name: KEYCLOAK_URL
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_url
+        - name: KEYCLOAK_REALM
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_realm
+        - name: KEYCLOAK_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_client_id
+        - name: KEYCLOAK_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-keycloak
+              key: client_secret
+        - name: OPENBAO_ROLE_ID
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-openbao
+              key: role_id
+        - name: OPENBAO_SECRET_ID
+          valueFrom:
+            secretKeyRef:
+              name: rentguy-openbao
+              key: secret_id
+        - name: OPENBAO_URL
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: openbao_url
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: rentguy-config
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentguy-frontend
+  namespace: sevensa-rentguy
+  labels:
+    app: rentguy
+    component: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rentguy
+      component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: rentguy
+        component: frontend
+    spec:
+      serviceAccountName: rentguy-sa
+      containers:
+      - name: frontend
+        image: sevensa/rentguy-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: api_url
+        - name: KEYCLOAK_URL
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_url
+        - name: KEYCLOAK_REALM
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_realm
+        - name: KEYCLOAK_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: rentguy-config
+              key: keycloak_client_id
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3

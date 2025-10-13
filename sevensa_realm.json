@@ -1,0 +1,427 @@
+{
+  "realm": "sevensa",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator role with full access"
+      },
+      {
+        "name": "rentguy-admin",
+        "description": "RentGuy administrator"
+      },
+      {
+        "name": "rentguy-user",
+        "description": "RentGuy regular user"
+      },
+      {
+        "name": "psra-admin",
+        "description": "PSRA administrator"
+      },
+      {
+        "name": "psra-user",
+        "description": "PSRA regular user"
+      },
+      {
+        "name": "wpcs-admin",
+        "description": "WPCS administrator"
+      },
+      {
+        "name": "wpcs-user",
+        "description": "WPCS regular user"
+      },
+      {
+        "name": "ai-admin",
+        "description": "AI Orchestrator administrator"
+      },
+      {
+        "name": "ai-user",
+        "description": "AI Orchestrator regular user"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "Administrators",
+      "path": "/Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "admin"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "RentGuy Users",
+      "path": "/RentGuy Users",
+      "attributes": {},
+      "realmRoles": [
+        "rentguy-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "RentGuy Administrators",
+      "path": "/RentGuy Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "rentguy-admin",
+        "rentguy-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "PSRA Users",
+      "path": "/PSRA Users",
+      "attributes": {},
+      "realmRoles": [
+        "psra-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "PSRA Administrators",
+      "path": "/PSRA Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "psra-admin",
+        "psra-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "WPCS Users",
+      "path": "/WPCS Users",
+      "attributes": {},
+      "realmRoles": [
+        "wpcs-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "WPCS Administrators",
+      "path": "/WPCS Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "wpcs-admin",
+        "wpcs-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "AI Users",
+      "path": "/AI Users",
+      "attributes": {},
+      "realmRoles": [
+        "ai-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "AI Administrators",
+      "path": "/AI Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "ai-admin",
+        "ai-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "bao-oidc",
+      "name": "OpenBao",
+      "description": "OpenBao OIDC Client",
+      "rootUrl": "http://127.0.0.1:${BAO_HTTP_PORT}",
+      "adminUrl": "http://127.0.0.1:${BAO_HTTP_PORT}",
+      "baseUrl": "http://127.0.0.1:${BAO_HTTP_PORT}",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_CLIENT_SECRET}",
+      "redirectUris": [
+        "http://127.0.0.1:${BAO_HTTP_PORT}/ui/vault/auth/oidc/oidc/callback",
+        "http://127.0.0.1:${BAO_HTTP_PORT}/ui/*"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:${BAO_HTTP_PORT}"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "rentguy-client",
+      "name": "RentGuy Application",
+      "description": "RentGuy SaaS Platform",
+      "rootUrl": "https://rentguy.sevensa.nl",
+      "adminUrl": "https://rentguy.sevensa.nl",
+      "baseUrl": "https://rentguy.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${RENTGUY_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://rentguy.sevensa.nl/*",
+        "https://onboarding.rentguy.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://rentguy.sevensa.nl",
+        "https://onboarding.rentguy.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "psra-client",
+      "name": "PSRA Application",
+      "description": "PSRA Trade Compliance Platform",
+      "rootUrl": "https://psra.sevensa.nl",
+      "adminUrl": "https://psra.sevensa.nl",
+      "baseUrl": "https://psra.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${PSRA_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://psra.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://psra.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "wpcs-client",
+      "name": "WPCS Application",
+      "description": "WordPress Cloud Services Platform",
+      "rootUrl": "https://wpcs.sevensa.nl",
+      "adminUrl": "https://wpcs.sevensa.nl",
+      "baseUrl": "https://wpcs.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${WPCS_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://wpcs.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://wpcs.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "ai-client",
+      "name": "AI Orchestration Platform",
+      "description": "AI Orchestration and Automation Platform",
+      "rootUrl": "https://ai.sevensa.nl",
+      "adminUrl": "https://ai.sevensa.nl",
+      "baseUrl": "https://ai.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${AI_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://ai.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://ai.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "oauth2-proxy",
+      "name": "OAuth2 Proxy",
+      "description": "OAuth2 Proxy for Traefik",
+      "rootUrl": "https://auth.sevensa.nl",
+      "adminUrl": "https://auth.sevensa.nl",
+      "baseUrl": "https://auth.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OAUTH2_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://auth.sevensa.nl/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://auth.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    }
+  ]
+}

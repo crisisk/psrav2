@@ -1,0 +1,8 @@
+{
+  "host": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.redis_host }}{{ end }}",
+  "port": {{ with secret "kv/data/rentguy/config" }}{{ .Data.data.redis_port }}{{ end }},
+  "password": "{{ with secret "kv/data/rentguy/config" }}{{ .Data.data.redis_password }}{{ end }}",
+  "db": 0,
+  "prefix": "rentguy:",
+  "ttl": 3600
+}

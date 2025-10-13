@@ -1,0 +1,505 @@
+{
+  "realm": "sevensa",
+  "enabled": true,
+  "displayName": "Sevensa Platform",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Sevensa Platform</span></div>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "defaultRoles": [
+    "user"
+  ],
+  "requiredCredentials": [
+    "password"
+  ],
+  "passwordPolicy": "length(10) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(1) and notEmail(1)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpSupportedApplications": [
+    "Google Authenticator",
+    "FreeOTP"
+  ],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicyReportOnly": "",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "smtpServer": {
+    "host": "${env.SMTP_HOST:smtp.sevensa.nl}",
+    "port": "${env.SMTP_PORT:587}",
+    "from": "${env.SMTP_FROM:no-reply@sevensa.nl}",
+    "fromDisplayName": "${env.SMTP_FROM_DISPLAY_NAME:Sevensa Platform}",
+    "replyTo": "${env.SMTP_REPLY_TO:support@sevensa.nl}",
+    "replyToDisplayName": "${env.SMTP_REPLY_TO_DISPLAY_NAME:Sevensa Support}",
+    "envelopeFrom": "${env.SMTP_ENVELOPE_FROM:no-reply@sevensa.nl}",
+    "ssl": "${env.SMTP_SSL:false}",
+    "starttls": "${env.SMTP_STARTTLS:true}",
+    "auth": "${env.SMTP_AUTH:true}",
+    "user": "${env.SMTP_USER}",
+    "password": "${env.SMTP_PASSWORD}"
+  },
+  "loginTheme": "sevensa",
+  "accountTheme": "sevensa",
+  "adminTheme": "sevensa",
+  "emailTheme": "sevensa",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "en",
+    "nl"
+  ],
+  "defaultLocale": "en",
+  "eventsEnabled": true,
+  "eventsListeners": [
+    "jboss-logging"
+  ],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "LOGOUT_ERROR",
+    "REGISTER",
+    "REGISTER_ERROR",
+    "UPDATE_PROFILE",
+    "UPDATE_PROFILE_ERROR",
+    "UPDATE_PASSWORD",
+    "UPDATE_PASSWORD_ERROR",
+    "UPDATE_EMAIL",
+    "UPDATE_EMAIL_ERROR",
+    "REMOVE_TOTP",
+    "REMOVE_TOTP_ERROR",
+    "VERIFY_EMAIL",
+    "VERIFY_EMAIL_ERROR",
+    "VERIFY_PROFILE",
+    "VERIFY_PROFILE_ERROR",
+    "SEND_VERIFY_EMAIL",
+    "SEND_VERIFY_EMAIL_ERROR",
+    "SEND_RESET_PASSWORD",
+    "SEND_RESET_PASSWORD_ERROR",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "RESTART_AUTHENTICATION",
+    "RESTART_AUTHENTICATION_ERROR",
+    "IMPERSONATE",
+    "IMPERSONATE_ERROR",
+    "CUSTOM_REQUIRED_ACTION",
+    "CUSTOM_REQUIRED_ACTION_ERROR",
+    "EXECUTE_ACTIONS",
+    "EXECUTE_ACTIONS_ERROR",
+    "EXECUTE_ACTION_TOKEN",
+    "EXECUTE_ACTION_TOKEN_ERROR",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR",
+    "TOKEN_EXCHANGE",
+    "TOKEN_EXCHANGE_ERROR",
+    "OAUTH2_DEVICE_AUTH",
+    "OAUTH2_DEVICE_AUTH_ERROR",
+    "OAUTH2_DEVICE_VERIFY",
+    "OAUTH2_DEVICE_VERIFY_ERROR",
+    "OAUTH2_DEVICE_COMPLETE",
+    "OAUTH2_DEVICE_COMPLETE_ERROR",
+    "IDENTITY_PROVIDER_LOGIN",
+    "IDENTITY_PROVIDER_LOGIN_ERROR",
+    "IDENTITY_PROVIDER_FIRST_LOGIN",
+    "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR",
+    "IDENTITY_PROVIDER_POST_LOGIN",
+    "IDENTITY_PROVIDER_POST_LOGIN_ERROR",
+    "IDENTITY_PROVIDER_LINK_ACCOUNT",
+    "IDENTITY_PROVIDER_LINK_ACCOUNT_ERROR",
+    "IDENTITY_PROVIDER_RESPONSE",
+    "IDENTITY_PROVIDER_RESPONSE_ERROR",
+    "IDENTITY_PROVIDER_RETRIEVE_TOKEN",
+    "IDENTITY_PROVIDER_RETRIEVE_TOKEN_ERROR",
+    "FEDERATED_IDENTITY_LINK",
+    "FEDERATED_IDENTITY_LINK_ERROR",
+    "CLIENT_REGISTER",
+    "CLIENT_REGISTER_ERROR",
+    "CLIENT_UPDATE",
+    "CLIENT_UPDATE_ERROR",
+    "CLIENT_DELETE",
+    "CLIENT_DELETE_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "clients": [
+    {
+      "clientId": "rentguy-app",
+      "name": "RentGuy Application",
+      "description": "RentGuy SaaS Platform",
+      "rootUrl": "https://rentguy.sevensa.nl",
+      "adminUrl": "https://rentguy.sevensa.nl",
+      "baseUrl": "https://rentguy.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.RENTGUY_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://rentguy.sevensa.nl/*",
+        "https://onboarding.rentguy.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://rentguy.sevensa.nl",
+        "https://onboarding.rentguy.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "saml.assertion.signature": "false",
+        "saml.force.post.binding": "false",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "false",
+        "saml.server.signature.keyinfo.ext": "false",
+        "exclude.session.state.from.auth.response": "false",
+        "saml_force_name_id_format": "false",
+        "saml.client.signature": "false",
+        "tls.client.certificate.bound.access.tokens": "false",
+        "saml.authnstatement": "false",
+        "display.on.consent.screen": "false",
+        "saml.onetimeuse.condition": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [
+        {
+          "name": "Client Host",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientHost",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clientHost",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "Client IP Address",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientAddress",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clientAddress",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "Client ID",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "clientId",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clientId",
+            "jsonType.label": "String"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "psra-app",
+      "name": "PSRA-LTSD Application",
+      "description": "PSRA-LTSD Trade Compliance Platform",
+      "rootUrl": "https://psra.sevensa.nl",
+      "adminUrl": "https://psra.sevensa.nl",
+      "baseUrl": "https://psra.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.PSRA_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://psra.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://psra.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "saml.assertion.signature": "false",
+        "saml.force.post.binding": "false",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "false",
+        "saml.server.signature.keyinfo.ext": "false",
+        "exclude.session.state.from.auth.response": "false",
+        "saml_force_name_id_format": "false",
+        "saml.client.signature": "false",
+        "tls.client.certificate.bound.access.tokens": "false",
+        "saml.authnstatement": "false",
+        "display.on.consent.screen": "false",
+        "saml.onetimeuse.condition": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "wpcs-app",
+      "name": "WPCS Application",
+      "description": "WordPress Control Suite",
+      "rootUrl": "https://wpcs.sevensa.nl",
+      "adminUrl": "https://wpcs.sevensa.nl",
+      "baseUrl": "https://wpcs.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.WPCS_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://wpcs.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://wpcs.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "ai-orchestrator",
+      "name": "AI Orchestrator",
+      "description": "AI Orchestration Platform",
+      "rootUrl": "https://ai.sevensa.nl",
+      "adminUrl": "https://ai.sevensa.nl",
+      "baseUrl": "https://ai.sevensa.nl",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.AI_ORCHESTRATOR_CLIENT_SECRET}",
+      "redirectUris": [
+        "https://ai.sevensa.nl/*",
+        "https://claude.sevensa.nl/*",
+        "https://n8n.sevensa.nl/*",
+        "https://langgraph.sevensa.nl/*"
+      ],
+      "webOrigins": [
+        "https://ai.sevensa.nl",
+        "https://claude.sevensa.nl",
+        "https://n8n.sevensa.nl",
+        "https://langgraph.sevensa.nl"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator role with full access"
+      },
+      {
+        "name": "user",
+        "description": "Regular user role"
+      },
+      {
+        "name": "rentguy-admin",
+        "description": "RentGuy administrator"
+      },
+      {
+        "name": "rentguy-user",
+        "description": "RentGuy regular user"
+      },
+      {
+        "name": "psra-admin",
+        "description": "PSRA administrator"
+      },
+      {
+        "name": "psra-user",
+        "description": "PSRA regular user"
+      },
+      {
+        "name": "wpcs-admin",
+        "description": "WPCS administrator"
+      },
+      {
+        "name": "wpcs-user",
+        "description": "WPCS regular user"
+      },
+      {
+        "name": "ai-admin",
+        "description": "AI Orchestrator administrator"
+      },
+      {
+        "name": "ai-user",
+        "description": "AI Orchestrator regular user"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "Administrators",
+      "path": "/Administrators",
+      "attributes": {},
+      "realmRoles": [
+        "admin"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "RentGuy Users",
+      "path": "/RentGuy Users",
+      "attributes": {},
+      "realmRoles": [
+        "rentguy-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "PSRA Users",
+      "path": "/PSRA Users",
+      "attributes": {},
+      "realmRoles": [
+        "psra-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "WPCS Users",
+      "path": "/WPCS Users",
+      "attributes": {},
+      "realmRoles": [
+        "wpcs-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    },
+    {
+      "name": "AI Users",
+      "path": "/AI Users",
+      "attributes": {},
+      "realmRoles": [
+        "ai-user"
+      ],
+      "clientRoles": {},
+      "subGroups": []
+    }
+  ]
+}

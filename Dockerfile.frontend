@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (skip prepare script)
+ENV npm_config_ignore_scripts=true
+RUN npm ci --only=production
+
+# Copy built Next.js application
+COPY .next ./.next
+COPY public ./public
+COPY next.config.js ./
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]

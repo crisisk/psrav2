@@ -1,0 +1,143 @@
+{
+  "database_credentials": [
+    {
+      "name": "rentguy_db",
+      "mount_path": "rentguy/database",
+      "role_name": "writer"
+    },
+    {
+      "name": "rentguy_db_readonly",
+      "mount_path": "rentguy/database",
+      "role_name": "reader"
+    },
+    {
+      "name": "psra_db",
+      "mount_path": "psra/database",
+      "role_name": "writer"
+    },
+    {
+      "name": "psra_db_readonly",
+      "mount_path": "psra/database",
+      "role_name": "reader"
+    },
+    {
+      "name": "wpcs_db",
+      "mount_path": "wpcs/database",
+      "role_name": "writer"
+    },
+    {
+      "name": "wpcs_db_readonly",
+      "mount_path": "wpcs/database",
+      "role_name": "reader"
+    },
+    {
+      "name": "ai_orchestrator_db",
+      "mount_path": "ai/database",
+      "role_name": "writer"
+    }
+  ],
+  "pki_certificates": [
+    {
+      "name": "rentguy_internal",
+      "mount_path": "pki_int",
+      "role_name": "rentguy-internal",
+      "common_name": "rentguy-api.service.sevensa.internal",
+      "ttl": "720h"
+    },
+    {
+      "name": "psra_internal",
+      "mount_path": "pki_int",
+      "role_name": "psra-internal",
+      "common_name": "psra-api.service.sevensa.internal",
+      "ttl": "720h"
+    },
+    {
+      "name": "wpcs_internal",
+      "mount_path": "pki_int",
+      "role_name": "wpcs-internal",
+      "common_name": "wpcs-api.service.sevensa.internal",
+      "ttl": "720h"
+    },
+    {
+      "name": "ai_orchestrator_internal",
+      "mount_path": "pki_int",
+      "role_name": "ai-internal",
+      "common_name": "ai-api.service.sevensa.internal",
+      "ttl": "720h"
+    }
+  ],
+  "kv_secrets": [
+    {
+      "name": "rentguy_api_keys",
+      "mount_path": "rentguy/kv",
+      "path": "api/keys",
+      "generator_script": "/etc/openbao/scripts/generate_api_key.sh"
+    },
+    {
+      "name": "psra_api_keys",
+      "mount_path": "psra/kv",
+      "path": "api/keys",
+      "generator_script": "/etc/openbao/scripts/generate_api_key.sh"
+    },
+    {
+      "name": "wpcs_api_keys",
+      "mount_path": "wpcs/kv",
+      "path": "api/keys",
+      "generator_script": "/etc/openbao/scripts/generate_api_key.sh"
+    },
+    {
+      "name": "ai_orchestrator_api_keys",
+      "mount_path": "ai/kv",
+      "path": "api/keys",
+      "generator_script": "/etc/openbao/scripts/generate_api_key.sh"
+    },
+    {
+      "name": "rentguy_jwt_secret",
+      "mount_path": "rentguy/kv",
+      "path": "auth/jwt",
+      "generator_script": "/etc/openbao/scripts/generate_jwt_secret.sh"
+    },
+    {
+      "name": "psra_jwt_secret",
+      "mount_path": "psra/kv",
+      "path": "auth/jwt",
+      "generator_script": "/etc/openbao/scripts/generate_jwt_secret.sh"
+    },
+    {
+      "name": "wpcs_jwt_secret",
+      "mount_path": "wpcs/kv",
+      "path": "auth/jwt",
+      "generator_script": "/etc/openbao/scripts/generate_jwt_secret.sh"
+    },
+    {
+      "name": "ai_orchestrator_jwt_secret",
+      "mount_path": "ai/kv",
+      "path": "auth/jwt",
+      "generator_script": "/etc/openbao/scripts/generate_jwt_secret.sh"
+    },
+    {
+      "name": "smtp_password",
+      "mount_path": "shared/kv",
+      "path": "smtp/credentials",
+      "generator_script": "/etc/openbao/scripts/generate_strong_password.sh"
+    }
+  ],
+  "transit_keys": [
+    {
+      "name": "rentguy_encryption_key",
+      "mount_path": "rentguy/transit"
+    },
+    {
+      "name": "psra_encryption_key",
+      "mount_path": "psra/transit"
+    },
+    {
+      "name": "wpcs_encryption_key",
+      "mount_path": "wpcs/transit"
+    },
+    {
+      "name": "ai_orchestrator_encryption_key",
+      "mount_path": "ai/transit"
+    }
+  ]
+}

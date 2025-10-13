@@ -1,0 +1,160 @@
+loki:
+  auth_enabled: false
+  server:
+    http_listen_port: 3100
+  storage:
+    type: filesystem
+  persistence:
+    enabled: true
+    storageClassName: sevensa-standard
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /data/loki/boltdb-shipper-active
+        cache_location: /data/loki/boltdb-shipper-cache
+        cache_ttl: 24h
+        shared_store: filesystem
+      filesystem:
+        directory: /data/loki/chunks
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      max_query_length: 12h
+      max_query_parallelism: 32
+    chunk_store_config:
+      max_look_back_period: 336h
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 336h
+    compactor:
+      working_directory: /data/loki/boltdb-shipper-compactor
+      shared_store: filesystem
+
+promtail:
+  enabled: true
+  config:
+    logLevel: info
+    serverPort: 3101
+    clients:
+      - url: http://{{ .Release.Name }}:3100/loki/api/v1/push
+    snippets:
+      pipelineStages:
+        - docker: {}
+        - cri: {}
+        - match:
+            selector: '{app="openbao"}'
+            stages:
+              - json:
+                  expressions:
+                    level: level
+                    msg: msg
+                    time: time
+              - labels:
+                  level:
+              - timestamp:
+                  source: time
+                  format: RFC3339
+        - match:
+            selector: '{app="keycloak"}'
+            stages:
+              - multiline:
+                  firstLine: '^\d{4}-\d{2}-\d{2}'
+              - regex:
+                  expression: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>[A-Z]+)'
+              - labels:
+                  level:
+              - timestamp:
+                  source: time
+                  format: '2006-01-02 15:04:05,000'
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+fluent-bit:
+  enabled: false
+
+logstash:
+  enabled: false
+
+filebeat:
+  enabled: false
+
+vector:
+  enabled: true
+  role: Agent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  customConfig:
+    data_dir: /vector-data-dir
+    api:
+      enabled: true
+      address: 127.0.0.1:8686
+    sources:
+      kubernetes_logs:
+        type: kubernetes_logs
+    transforms:
+      remap_timestamps:
+        type: remap
+        inputs:
+          - kubernetes_logs
+        source: |
+          .timestamp = parse_timestamp(.timestamp) ?? now()
+      add_cluster_name:
+        type: remap
+        inputs:
+          - remap_timestamps
+        source: |
+          .cluster = "sevensa-cluster"
+      filter_sensitive_data:
+        type: remap
+        inputs:
+          - add_cluster_name
+        source: |
+          if includes(["password", "secret", "token", "key"], .message) {
+            .message = "REDACTED SENSITIVE DATA"
+          }
+    sinks:
+      loki:
+        type: loki
+        inputs:
+          - filter_sensitive_data
+        endpoint: http://{{ .Release.Name }}:3100
+        encoding:
+          codec: json
+        labels:
+          app: "{{ .pod_labels.app }}"
+          namespace: "{{ .kubernetes.namespace }}"
+          pod: "{{ .kubernetes.pod_name }}"
+          container: "{{ .kubernetes.container_name }}"
+          level: "{{ .level }}"
+          cluster: "{{ .cluster }}"
+        out_of_order_action: accept
+        remove_timestamp: false
+        tenant_id: "sevensa"

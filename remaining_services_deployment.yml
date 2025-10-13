@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # 1. Claude Chat Service (Assuming a simple Python app)
+  claude_chat:
+    image: python:3.11-slim # Placeholder image, replace with actual build context if available
+    container_name: claude_chat
+    restart: always
+    command: ["/bin/true"] # Placeholder command
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.claude-chat.rule=Host(\`claude.sevensa.nl\`)"
+      - "traefik.http.routers.claude-chat.entrypoints=websecure"
+      - "traefik.http.routers.claude-chat.tls=true"
+      - "traefik.http.routers.claude-chat.service=claude-chat-service"
+      - "traefik.http.services.claude-chat-service.loadbalancer.server.port=8004"
+    networks:
+      - web
+
+  # 2. N8N Service (Standard N8N deployment)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    environment:
+      - N8N_HOST=n8n.sevensa.nl
+      - N8N_PORT=8005
+      - VUE_APP_URL_BASE_API=https://n8n.sevensa.nl/
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(\`n8n.sevensa.nl\`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.routers.n8n.service=n8n-service"
+      - "traefik.http.services.n8n-service.loadbalancer.server.port=8005"
+    networks:
+      - web
+
+  # 3. Trading Dashboard Service (Assuming a simple web app)
+  trading_dashboard:
+    image: nginx:alpine # Placeholder image
+    container_name: trading_dashboard
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trading.rule=Host(\`trading.sevensa.nl\`)"
+      - "traefik.http.routers.trading.entrypoints=websecure"
+      - "traefik.http.routers.trading.tls=true"
+      - "traefik.http.routers.trading.service=trading-service"
+      - "traefik.http.services.trading-service.loadbalancer.server.port=8006"
+    networks:
+      - web
+
+  # 4. LangGraph Service (Assuming a simple Python app)
+  langgraph_service:
+    image: python:3.11-slim # Placeholder image
+    container_name: langgraph_service
+    restart: always
+    command: ["/bin/true"] # Placeholder command
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.langgraph.rule=Host(\`langgraph.sevensa.nl\`)"
+      - "traefik.http.routers.langgraph.entrypoints=websecure"
+      - "traefik.http.routers.langgraph.tls=true"
+      - "traefik.http.routers.langgraph.service=langgraph-service"
+      - "traefik.http.services.langgraph-service.loadbalancer.server.port=8007"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

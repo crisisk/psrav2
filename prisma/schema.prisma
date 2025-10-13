@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Certificate {
+  id          String   @id @default(cuid())
+  productSku  String
+  hs6         String
+  agreement   String
+  status      String   @default("pending")
+  result      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("certificates")
+}
+
+model Rule {
+  id          String   @id @default(cuid())
+  agreement   String
+  hs6         String
+  description String?
+  conditions  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("rules")
+}
+
+model HsCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  chapter     String
+  section     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("hs_codes")
+}
+
+model TradeAgreement {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("trade_agreements")
+}
+
+model OriginRule {
+  id              String   @id @default(cuid())
+  hsCode          String
+  tradeAgreement  String
+  ruleText        String
+  conditions      Json
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("origin_rules")
+}

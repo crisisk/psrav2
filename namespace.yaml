@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-rentguy
+  labels:
+    name: sevensa-rentguy
+    part-of: sevensa
+    component: rentguy
+  annotations:
+    linkerd.io/inject: enabled

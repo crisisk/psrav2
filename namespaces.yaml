@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-system
+  labels:
+    name: sevensa-system
+    part-of: sevensa
+    component: system
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-security
+  labels:
+    name: sevensa-security
+    part-of: sevensa
+    component: security
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-rentguy
+  labels:
+    name: sevensa-rentguy
+    part-of: sevensa
+    component: rentguy
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-psra
+  labels:
+    name: sevensa-psra
+    part-of: sevensa
+    component: psra
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-wpcs
+  labels:
+    name: sevensa-wpcs
+    part-of: sevensa
+    component: wpcs
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sevensa-ai
+  labels:
+    name: sevensa-ai
+    part-of: sevensa
+    component: ai
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    part-of: sevensa
+    component: monitoring
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    name: logging
+    part-of: sevensa
+    component: logging
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  labels:
+    name: traefik
+    part-of: sevensa
+    component: ingress
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+    part-of: sevensa
+    component: gitops

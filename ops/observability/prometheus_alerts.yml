@@ -1,0 +1,137 @@
+groups:
+  - name: psra_slo_alerts
+    interval: 30s
+    rules:
+      # Error Budget Burn - Critical
+      - alert: ErrorBudgetBurnCritical
+        expr: |
+          (
+            sum(rate(psra_http_requests_total{status=~"5.."}[1h]))
+            /
+            sum(rate(psra_http_requests_total[1h]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error budget burning too fast"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://docs.sevensa.nl/runbooks/error-budget"
+
+      # ETL Staleness - Critical
+      - alert: ETLStaleness
+        expr: (time() - psra_etl_last_success_timestamp) > 7200
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ETL pipeline stale for >2 hours"
+          description: "Last successful ETL run was {{ $value | humanizeDuration }} ago"
+          runbook_url: "https://docs.sevensa.nl/runbooks/etl-stale"
+
+      # Webhook Failure Rate - Critical
+      - alert: WebhookFailureRateHigh
+        expr: |
+          (
+            sum(rate(psra_webhook_deliveries_total{status="failed"}[5m]))
+            /
+            sum(rate(psra_webhook_deliveries_total[5m]))
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Webhook failure rate >5%"
+          description: "{{ $value | humanizePercentage }} of webhooks failing"
+          runbook_url: "https://docs.sevensa.nl/runbooks/webhook-failures"
+
+      # High p95 Latency - Warning
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(psra_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency >200ms on {{ $labels.endpoint }}"
+          description: "p95 latency is {{ $value }}s"
+          runbook_url: "https://docs.sevensa.nl/runbooks/high-latency"
+
+      # LLM Cost Spike - Warning
+      - alert: LLMCostSpike
+        expr: |
+          rate(psra_llm_cost_dollars_total[1h]) > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM cost spike detected"
+          description: "LLM costs are ${{ $value }}/hour (threshold: $100/hour)"
+          runbook_url: "https://docs.sevensa.nl/runbooks/llm-cost-spike"
+
+      # Cache Hit Rate Low - Warning
+      - alert: CacheHitRateLow
+        expr: |
+          (
+            sum(rate(psra_cache_hits_total[5m]))
+            /
+            (sum(rate(psra_cache_hits_total[5m])) + sum(rate(psra_cache_misses_total[5m])))
+          ) < 0.70
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache hit rate <70%"
+          description: "Hit rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.sevensa.nl/runbooks/cache-hit-rate"
+
+      # Database Query Slow - Warning
+      - alert: DatabaseQuerySlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(psra_database_query_duration_seconds_bucket[5m])) by (le, query_type)
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries on {{ $labels.query_type }}"
+          description: "p95 query time is {{ $value }}s"
+          runbook_url: "https://docs.sevensa.nl/runbooks/slow-queries"
+
+      # Container Down - Critical
+      - alert: PSRAContainerDown
+        expr: up{job="psra"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PSRA container {{ $labels.instance }} is down"
+          description: "Container has been down for >2 minutes"
+          runbook_url: "https://docs.sevensa.nl/runbooks/container-down"
+
+      # High Memory Usage - Warning
+      - alert: HighMemoryUsage
+        expr: |
+          (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.container_name }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.sevensa.nl/runbooks/high-memory"
+
+      # Disk Space Low - Warning
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.mountpoint }}"
+          description: "Only {{ $value | humanizePercentage }} free"
+          runbook_url: "https://docs.sevensa.nl/runbooks/disk-space"

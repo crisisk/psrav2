@@ -1,0 +1,88 @@
+# Traefik Dynamic Configuration - Middlewares
+# This file defines middlewares for Traefik
+
+http:
+  middlewares:
+    # Secure headers middleware
+    secure-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        frameDeny: true
+        sslRedirect: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "DENY"
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    
+    # Rate limit middleware
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+    
+    # IP whitelist middleware for admin access
+    admin-whitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+    
+    # Basic auth middleware for Traefik dashboard
+    traefik-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"  # admin:admin (change in production)
+    
+    # OAuth2 middleware for authentication
+    oauth2-auth:
+      forwardAuth:
+        address: "http://oauth2-proxy:4180"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-Auth-Request-User"
+          - "X-Auth-Request-Email"
+          - "X-Auth-Request-Access-Token"
+          - "X-Auth-Request-User-Groups"
+    
+    # Retry middleware
+    retry-middleware:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+    
+    # Compress middleware
+    compress:
+      compress: {}
+    
+    # Error pages middleware
+    error-pages:
+      errors:
+        status:
+          - "400-499"
+        service: error-handler
+        query: "/{status}.html"
+    
+    # Chain middleware for common security
+    common-security-chain:
+      chain:
+        middlewares:
+          - secure-headers
+          - compress
+          - rate-limit
+    
+    # Chain middleware for authenticated routes
+    auth-chain:
+      chain:
+        middlewares:
+          - secure-headers
+          - compress
+          - rate-limit
+          - oauth2-auth
