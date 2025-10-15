@@ -1,0 +1,151 @@
+# Kubernetes NetworkPolicies for segmentation (future-ready)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-policy
+  namespace: psra
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0  # Allow external via proxy
+      ports:
+        - protocol: TCP
+          port: 443
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS only
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-policy
+  namespace: psra
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 443
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: database
+        - podSelector:
+            matchLabels:
+              app: ml-service
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-policy
+  namespace: psra
+spec:
+  podSelector:
+    matchLabels:
+      app: database
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL port
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-policy
+  namespace: psra
+spec:
+  podSelector:
+    matchLabels:
+      app: ml-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 8501  # TensorFlow serving port
+
+# AWS Security Groups (Terraform/HCL snippet for reference; apply via AWS CLI or Terraform)
+# Assumes EC2 instances tagged with "psra-deployment"
+# Security Group for Frontend (allows HTTPS from anywhere, SSH via VPN)
+resource "aws_security_group" "frontend_sg" {
+  name        = "psra-frontend-sg"
+  description = "Allow HTTPS and VPN-SSH"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Public HTTPS
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]  # VPN subnet only
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Security Group for Backend/Database/ML (internal only)
+resource "aws_security_group" "internal_sg" {
+  name        = "psra-internal-sg"
+  description = "Internal traffic only"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port       = 0
+    to_port         = 65535
+    protocol        = "tcp"
+    security_groups = [aws_security_group.frontend_sg.id]  # From frontend SG
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}

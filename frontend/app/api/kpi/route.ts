@@ -1,0 +1,1 @@
+import { NextResponse } from 'next/server'; import { getKpis } from '@/lib/repository'; export async function GET(){ const k: any=await getKpis(); return NextResponse.json({ manhours_reduction_pct: 0.0, ai_accuracy_pct: k.ai_accuracy_pct, pending_requests: k.pending_requests, certificates_today: k.certificates_today }); }
