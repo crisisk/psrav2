@@ -1,0 +1,699 @@
+openapi: 3.1.0
+info:
+  title: PSRA API
+  version: 1.0.0
+  description: |
+    Comprehensive API for Product Safety Risk Assessment (PSRA). This API enables management of certificates, evaluations, rules, materials, and statistics to assess and mitigate product safety risks. All endpoints require authentication via Bearer token. Rate limited to 100 requests per minute per user/IP.
+  contact:
+    name: PSRA Support
+    email: support@psra.com
+    url: https://psra.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.psra.dev
+    description: Development environment
+  - url: https://staging.api.psra.com
+    description: Staging environment
+  - url: https://api.psra.com
+    description: Production environment
+tags:
+  - name: Certificates
+    description: Endpoints for managing product safety certificates.
+  - name: Evaluations
+    description: Endpoints for managing risk evaluations.
+  - name: Rules
+    description: Endpoints for accessing safety rules (read-only).
+  - name: Materials
+    description: Endpoints for accessing material data (read-only).
+security:
+  - bearerAuth: []
+paths:
+  /certificates:
+    get:
+      tags: [Certificates]
+      summary: List certificates
+      description: |
+        Retrieve a paginated list of certificates. Supports filtering by status and product type. Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/certificates?page=1&limit=10`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of items per page.
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+          description: Filter by certificate status.
+        - name: productType
+          in: query
+          schema:
+            type: string
+          description: Filter by product type.
+      responses:
+        '200':
+          description: Successful response with list of certificates.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Certificate'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id: "cert-123"
+                    productName: "Toy Car"
+                    status: "approved"
+                    issuedDate: "2023-01-01"
+                    expiryDate: "2024-01-01"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 100
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Certificates]
+      summary: Create a certificate
+      description: |
+        Create a new certificate. Rate limited to 100 requests per minute.
+        cURL example: `curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"productName":"Toy Car","status":"pending"}' https://api.psra.com/certificates`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateCreate'
+            example:
+              productName: "Toy Car"
+              status: "pending"
+              issuedDate: "2023-01-01"
+              expiryDate: "2024-01-01"
+      responses:
+        '201':
+          description: Certificate created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+              example:
+                id: "cert-123"
+                productName: "Toy Car"
+                status: "pending"
+                issuedDate: "2023-01-01"
+                expiryDate: "2024-01-01"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /certificates/{id}:
+    get:
+      tags: [Certificates]
+      summary: Get a certificate
+      description: |
+        Retrieve a specific certificate by ID. Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/certificates/cert-123`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate ID.
+      responses:
+        '200':
+          description: Certificate retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+              example:
+                id: "cert-123"
+                productName: "Toy Car"
+                status: "approved"
+                issuedDate: "2023-01-01"
+                expiryDate: "2024-01-01"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Certificates]
+      summary: Update a certificate
+      description: |
+        Update an existing certificate. Rate limited to 100 requests per minute.
+        cURL example: `curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"status":"approved"}' https://api.psra.com/certificates/cert-123`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateUpdate'
+            example:
+              status: "approved"
+              expiryDate: "2024-01-01"
+      responses:
+        '200':
+          description: Certificate updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+              example:
+                id: "cert-123"
+                productName: "Toy Car"
+                status: "approved"
+                issuedDate: "2023-01-01"
+                expiryDate: "2024-01-01"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Certificates]
+      summary: Delete a certificate
+      description: |
+        Delete a certificate by ID. Rate limited to 100 requests per minute.
+        cURL example: `curl -X DELETE -H "Authorization: Bearer <token>" https://api.psra.com/certificates/cert-123`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate ID.
+      responses:
+        '204':
+          description: Certificate deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /evaluations:
+    get:
+      tags: [Evaluations]
+      summary: List evaluations
+      description: |
+        Retrieve a paginated list of evaluations. Supports filtering by risk level. Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/evaluations?page=1&limit=10&riskLevel=high`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: riskLevel
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high]
+      responses:
+        '200':
+          description: Successful response with list of evaluations.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Evaluation'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id: "eval-456"
+                    productId: "prod-789"
+                    riskLevel: "high"
+                    assessedDate: "2023-02-01"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 50
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Evaluations]
+      summary: Create an evaluation
+      description: |
+        Create a new evaluation. Rate limited to 100 requests per minute.
+        cURL example: `curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"productId":"prod-789","riskLevel":"high"}' https://api.psra.com/evaluations`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationCreate'
+            example:
+              productId: "prod-789"
+              riskLevel: "high"
+              assessedDate: "2023-02-01"
+      responses:
+        '201':
+          description: Evaluation created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluation'
+              example:
+                id: "eval-456"
+                productId: "prod-789"
+                riskLevel: "high"
+                assessedDate: "2023-02-01"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /evaluations/{id}:
+    get:
+      tags: [Evaluations]
+      summary: Get an evaluation
+      description: |
+        Retrieve a specific evaluation by ID. Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/evaluations/eval-456`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evaluation retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluation'
+              example:
+                id: "eval-456"
+                productId: "prod-789"
+                riskLevel: "high"
+                assessedDate: "2023-02-01"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Evaluations]
+      summary: Update an evaluation
+      description: |
+        Update an existing evaluation. Rate limited to 100 requests per minute.
+        cURL example: `curl -X PUT -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"riskLevel":"medium"}' https://api.psra.com/evaluations/eval-456`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationUpdate'
+            example:
+              riskLevel: "medium"
+      responses:
+        '200':
+          description: Evaluation updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluation'
+              example:
+                id: "eval-456"
+                productId: "prod-789"
+                riskLevel: "medium"
+                assessedDate: "2023-02-01"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Evaluations]
+      summary: Delete an evaluation
+      description: |
+        Delete an evaluation by ID. Rate limited to 100 requests per minute.
+        cURL example: `curl -X DELETE -H "Authorization: Bearer <token>" https://api.psra.com/evaluations/eval-456`
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Evaluation deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /rules:
+    get:
+      tags: [Rules]
+      summary: List rules
+      description: |
+        Retrieve a paginated list of safety rules (read-only). Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/rules?page=1&limit=10`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Successful response with list of rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rule'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id: "rule-101"
+                    name: "Choking Hazard Rule"
+                    description: "Products must not have small parts."
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 20
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /materials:
+    get:
+      tags: [Materials]
+      summary: List materials
+      description: |
+        Retrieve a paginated list of materials (read-only). Rate limited to 100 requests per minute.
+        cURL example: `curl -H "Authorization: Bearer <token>" https://api.psra.com/materials?page=1&limit=10`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Successful response with list of materials.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Material'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id: "mat-202"
+                    name: "Plastic ABS"
+                    safetyRating: "safe"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 30
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Certificate:
+      type: object
+      properties:
+        id:
+          type: string
+        productName:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        issuedDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+      required: [id, productName, status]
+    CertificateCreate:
+      type: object
+      properties:
+        productName:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        issuedDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+      required: [productName, status]
+    CertificateUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        expiryDate:
+          type: string
+          format: date
+    Evaluation:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+        assessedDate:
+          type: string
+          format: date
+      required: [id, productId, riskLevel]
+    EvaluationCreate:
+      type: object
+      properties:
+        productId:
+          type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+        assessedDate:
+          type: string
+          format: date
+      required: [productId, riskLevel]
+    EvaluationUpdate:
+      type: object
+      properties:
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+    Rule:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+      required: [id, name, description]
+    Material:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        safetyRating:
+          type: string
+          enum: [safe, caution, unsafe]
+      required: [id, name, safetyRating]
+    Statistics:
+      type: object
+      properties:
+        totalCertificates:
+          type: integer
+        totalEvaluations:
+          type: integer
+        highRiskCount:
+          type: integer
+      required: [totalCertificates, totalEvaluations, highRiskCount]
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [page, limit, total]
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+      required: [code, message]
+  responses:
+    BadRequest:
+      description: Bad request - invalid input.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INVALID_INPUT"
+            message: "The provided data is invalid."
+            details: { field: "status", issue: "must be one of: pending, approved, rejected" }
+    Unauthorized:
+      description: Unauthorized - invalid or missing token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "UNAUTHORIZED"
+            message: "Authentication required."
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "NOT_FOUND"
+            message: "The requested resource does not exist."
+    RateLimited:
+      description: Too many requests - rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "RATE_LIMIT_EXCEEDED"
+            message: "Request rate limit exceeded. Try again later."
+    InternalServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INTERNAL_ERROR"
+            message: "An unexpected error occurred."

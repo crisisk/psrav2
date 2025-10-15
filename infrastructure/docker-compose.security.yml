@@ -1,0 +1,106 @@
+version: '3.8'
+
+# Define separate networks for segmentation
+networks:
+  frontend:
+    driver: bridge
+    internal: false  # Allows external access via proxy
+  backend:
+    driver: bridge
+    internal: true   # Isolated
+  database:
+    driver: bridge
+    internal: true   # Isolated
+  ml:
+    driver: bridge
+    internal: true   # Isolated
+
+# Secrets for TLS certificates (self-signed for demo; use CA-issued in prod)
+secrets:
+  tls_cert:
+    file: ./certs/server.crt
+  tls_key:
+    file: ./certs/server.key
+
+services:
+  # Frontend service (e.g., React app) - Exposed via NGINX proxy with rate limiting
+  frontend:
+    image: nginx:alpine
+    networks:
+      - frontend
+    ports:
+      - "443:443"  # External HTTPS only
+    volumes:
+      - ./frontend/static:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf  # Includes rate limiting (DDoS protection)
+    secrets:
+      - source: tls_cert
+        target: /etc/ssl/certs/server.crt
+      - source: tls_key
+        target: /etc/ssl/private/server.key
+    environment:
+      - NGINX_ENFORCE_SSL=true
+    depends_on:
+      - backend
+
+  # Backend service (e.g., Node.js API) - Internal HTTPS only
+  backend:
+    image: node:14-alpine
+    networks:
+      - backend
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=database
+      - ML_HOST=ml-service
+      - HTTPS=true
+    secrets:
+      - source: tls_cert
+        target: /app/certs/server.crt
+      - source: tls_key
+        target: /app/certs/server.key
+    command: ["node", "server.js"]  # Assume HTTPS-enabled server
+    depends_on:
+      - database
+      - ml-service
+
+  # Database service (e.g., PostgreSQL) - Isolated
+  database:
+    image: postgres:13
+    networks:
+      - database
+    environment:
+      - POSTGRES_DB=psra_db
+      - POSTGRES_USER=psra_user
+      - POSTGRES_PASSWORD=secure_password  # Use secrets in prod
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  # ML service (e.g., TensorFlow serving) - Isolated
+  ml-service:
+    image: tensorflow/serving:latest
+    networks:
+      - ml
+    volumes:
+      - ./ml_model:/models/my_model
+    environment:
+      - MODEL_NAME=my_model
+
+  # Prometheus for network monitoring
+  prometheus:
+    image: prom/prometheus
+    networks:
+      - frontend  # Attach to frontend for metrics scraping
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+volumes:
+  db_data:

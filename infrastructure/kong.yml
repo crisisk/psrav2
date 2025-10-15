@@ -1,0 +1,131 @@
+_format_version: "3.0"
+
+# Upstream for load balancing across backend instances
+upstreams:
+  - name: user-service-upstream
+    targets:
+      - target: user-service-1:8080
+        weight: 100
+      - target: user-service-2:8080
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: "/health"
+        timeout: 5
+        concurrency: 10
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          http_failures: 3
+  - name: product-service-upstream
+    targets:
+      - target: product-service-1:8080
+        weight: 100
+      - target: product-service-2:8080
+        weight: 100
+    healthchecks:
+      active:
+        type: http
+        http_path: "/health"
+        timeout: 5
+        concurrency: 10
+        healthy:
+          interval: 10
+          successes: 2
+        unhealthy:
+          interval: 10
+          http_failures: 3
+
+# Services representing backend APIs
+services:
+  - name: user-service
+    url: http://user-service-upstream  # Routes to upstream for load balancing
+    routes:
+      - name: user-v1-route
+        paths: ["/v1/users"]  # API versioning via path
+        methods: ["GET", "POST", "PUT", "DELETE"]
+      - name: user-v2-route
+        paths: ["/v2/users"]
+        methods: ["GET", "POST", "PUT", "DELETE"]
+    plugins:
+      - name: jwt  # Authentication: JWT validation
+        config:
+          claims_to_verify: ["exp", "iss"]
+          key_claim_name: "kid"
+          secret_is_base64: false
+      - name: rate-limiting  # Rate limiting: 100 req/min per consumer
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer  # Request transformation: Add custom header, modify body
+        config:
+          add:
+            headers: ["X-Gateway-Version:1.0"]
+          replace:
+            body: '["transformed_body"]'  # Example: Replace JSON body
+      - name: proxy-cache  # Response caching: Cache GET responses for 5 min
+        config:
+          content_type: ["application/json"]
+          cache_ttl: 300
+          strategy: memory
+      - name: circuit-breaker  # Circuit breaking: Trip after 5 failures, recover after 10s
+        config:
+          failure_threshold: 5
+          recovery_timeout: 10
+          healthcheck_interval: 5
+      - name: prometheus  # Monitoring: Expose metrics for requests/responses
+        config:
+          per_consumer: true
+          status_code_metrics: true
+  - name: product-service
+    url: http://product-service-upstream
+    routes:
+      - name: product-v1-route
+        paths: ["/v1/products"]
+        methods: ["GET", "POST", "PUT", "DELETE"]
+      - name: product-v2-route
+        paths: ["/v2/products"]
+        methods: ["GET", "POST", "PUT", "DELETE"]
+    plugins:
+      - name: jwt
+        config:
+          claims_to_verify: ["exp", "iss"]
+          key_claim_name: "kid"
+          secret_is_base64: false
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Gateway-Version:1.0"]
+          replace:
+            body: '["transformed_body"]'
+      - name: proxy-cache
+        config:
+          content_type: ["application/json"]
+          cache_ttl: 300
+          strategy: memory
+      - name: circuit-breaker
+        config:
+          failure_threshold: 5
+          recovery_timeout: 10
+          healthcheck_interval: 5
+      - name: prometheus
+        config:
+          per_consumer: true
+          status_code_metrics: true
+
+# Consumers (example for auth/rate limiting)
+consumers:
+  - username: api-consumer
+    custom_id: consumer-123
+    plugins:
+      - name: jwt
+        config:
+          key: "my-secret-key"
+          algorithm: "HS256"

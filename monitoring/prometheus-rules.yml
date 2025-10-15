@@ -1,0 +1,38 @@
+groups:
+  - name: psra_alerts
+    rules:
+      - alert: PSRA_Uptime_SLO_Breach
+        expr: psra_availability_sli < 99.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PSRA uptime SLO breached (99.9%)"
+          description: "Current availability: {{ $value }}%"
+
+      - alert: PSRA_Latency_SLO_Breach
+        expr: psra_latency_sli < 95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSRA latency SLO breached (95% under 2s)"
+          description: "Current latency compliance: {{ $value }}%"
+
+      - alert: PSRA_High_Validation_Time
+        expr: histogram_quantile(0.95, rate(psra_validation_time_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSRA validation time is high"
+          description: "95th percentile validation time: {{ $value }}s"
+
+      - alert: PSRA_High_Error_Rate
+        expr: rate(psra_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PSRA error rate is high"
+          description: "Error rate: {{ $value }}/s"

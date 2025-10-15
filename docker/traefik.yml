@@ -1,0 +1,83 @@
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+
+api:
+  dashboard: true
+  insecure: true
+  debug: true
+
+log:
+  level: DEBUG
+  filePath: "/var/log/traefik/access.log"
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "admin@sevensa.nl"
+      storage: "/etc/traefik/acme.json"
+      httpChallenge:
+        entryPoint: web
+
+middlewares:
+  rate-limit:
+    rateLimit:
+      average: 100
+      burst: 50
+
+routers:
+  psra-router:
+    rule: "Host(`psra.sevensa.nl`)"
+    service: psra-service
+    middlewares:
+      - rate-limit
+    tls:
+      certResolver: letsencrypt
+
+  demo-router:
+    rule: "Host(`demo.sevensa.nl`)"
+    service: demo-service
+    middlewares:
+      - rate-limit
+    tls:
+      certResolver: letsencrypt
+
+  api-router:
+    rule: "Host(`api.psra.sevensa.nl`)"
+    service: api-service
+    middlewares:
+      - rate-limit
+    tls:
+      certResolver: letsencrypt
+
+services:
+  psra-service:
+    loadBalancer:
+      servers:
+        - url: "http://psra-app:80"
+
+  demo-service:
+    loadBalancer:
+      servers:
+        - url: "http://demo-app:80"
+
+  api-service:
+    loadBalancer:
+      servers:
+        - url: "http://api-app:80"
