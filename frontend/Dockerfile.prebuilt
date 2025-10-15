@@ -1,0 +1,22 @@
+# Production server using pre-built .next directory
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Install production dependencies only
+COPY package.json package-lock.json* ./
+RUN npm ci --production --legacy-peer-deps
+
+# Copy pre-built files
+COPY .next ./.next
+COPY public ./public
+COPY package.json ./
+
+# Expose the port Next.js runs on
+EXPOSE 3000
+
+# Start the Next.js server
+CMD ["npm", "start"]

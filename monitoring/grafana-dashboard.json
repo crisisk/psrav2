@@ -1,0 +1,82 @@
+{
+  "dashboard": {
+    "title": "PSRA Monitoring Dashboard",
+    "tags": ["psra", "monitoring"],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Certificates Issued per Day",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(psra_certificates_issued_total[1d])",
+            "legendFormat": "Certificates/day"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Validation Time (95th Percentile)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(psra_validation_time_seconds_bucket[5m]))",
+            "legendFormat": "95th Percentile (s)"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Uptime SLO Compliance",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "psra_availability_sli",
+            "legendFormat": "Availability (%)"
+          }
+        ],
+        "thresholds": "99.9,99.95"
+      },
+      {
+        "id": 4,
+        "title": "Latency SLO Compliance",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "psra_latency_sli",
+            "legendFormat": "Latency Compliance (%)"
+          }
+        ],
+        "thresholds": "95,99"
+      },
+      {
+        "id": 5,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(psra_errors_total[5m])",
+            "legendFormat": "Errors/s"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Alerts",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ALERTS{alertname=~\"PSRA_.*\"}",
+            "legendFormat": "{{ alertname }}"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "refresh": "5m"
+  }
+}

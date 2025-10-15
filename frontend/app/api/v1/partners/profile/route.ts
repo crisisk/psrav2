@@ -1,0 +1,28 @@
+import { NextResponse } from 'next/server';
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const body = await request.json();
+
+    // TODO: Validate input
+    // TODO: Implement actual database update
+
+    const updated = {
+      id: id,
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return NextResponse.json(updated, { status: 200 });
+  } catch (error) {
+    console.error('[API Error] PUT /api/v1/partners/profile:', error);
+    return NextResponse.json(
+      { error: 'Failed to update profile' },
+      { status: 500 }
+    );
+  }
+}
