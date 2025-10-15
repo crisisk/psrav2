@@ -1,0 +1,1 @@
+import { NextResponse } from 'next/server'; import { getTraceByRequestId } from '@/lib/repository'; export async function GET(_:Request,{params}:{params:{requestId:string}}){ const data = await getTraceByRequestId(params.requestId); return NextResponse.json(data); }

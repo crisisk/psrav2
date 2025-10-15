@@ -1,0 +1,26 @@
+# /home/vncuser/psra-ltsd-enterprise-v2/docker-compose.override.yml (Keycloak service section only)
+# This override file updates the Keycloak service to fix UDP buffer issues, configure single-node mode,
+# add proper health checks, and set resource limits. It assumes the base docker-compose.yml has the Keycloak service defined.
+services:
+  keycloak:
+    environment:
+      # Configure Keycloak for single-node mode to avoid clustering issues
+      - KC_CACHE_STACK=local  # Use local cache stack, no clustering
+      - JGROUPS_DISCOVERY_PROTOCOL=none  # Disable JGroups discovery to prevent UDP issues
+      # Other Keycloak env vars as needed (e.g., KC_DB_URL, etc.)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # Limit memory to prevent resource exhaustion
+          cpus: '1.0'  # Limit CPU
+        reservations:
+          memory: 512M  # Reserve memory
+          cpus: '0.5'
+    # Ensure the container has necessary capabilities or sysctls if needed, but for UDP, we'll handle at host level
+    # If using Docker Compose v3.8+, you can add sysctls here, but for simplicity, use the system script

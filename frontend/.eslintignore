@@ -1,0 +1,26 @@
+# Ignore slide-based pages (HTML to JSX conversion pending)
+app/dashboard/slide-*/
+app/onboarding/step-*/
+app/year1/*/
+app/year2/*/
+app/year3/*/
+app/misc/*/
+app/partners/onboarding_*/
+app/partners/partner_*/
+app/partners/customer_*/
+app/partners/commission_*/
+app/partners/lead_*/
+app/partners/resource_*/
+app/partners/bulk_*/
+app/compliance/ai-act/*/
+app/compliance/cbam/*/
+app/certificates/bulk_approval/
+app/certificates/create/
+app/certificates/detail/
+app/certificates/edit/
+app/certificates/history/
+app/certificates/list/
+app/suppliers/*/
+app/products/detail_view/
+app/products/create_page/
+app/products/edit/
