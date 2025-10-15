@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  psra-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: psra-frontend
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=https://psra.sevensa.nl
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-this-secret}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:pass@localhost:5432/psra}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.psra.rule=Host(`psra.sevensa.nl`)"
+      - "traefik.http.routers.psra.entrypoints=websecure"
+      - "traefik.http.routers.psra.tls.certresolver=letsencrypt"
+      - "traefik.http.services.psra.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik-network"
+
+networks:
+  traefik-network:
+    external: true
