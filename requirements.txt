@@ -36,7 +36,7 @@ pyjwt==2.8.0
 cryptography==46.0.2
 
 # Secrets Management
-hvac==2.1.0
+hvac==2.3.0
 
 # Testing
 pytest==7.4.3
