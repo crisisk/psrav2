@@ -1,0 +1,7 @@
+export enum AssessmentStage {
+  INITIATION = 'INITIATION',
+  PLANNING = 'PLANNING',
+  EXECUTION = 'EXECUTION',
+  REVIEW = 'REVIEW',
+  CLOSED = 'CLOSED'
+}
